@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>consolio — API Testing</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #080808;
+            --surface: #0f0f0f;
+            --surface2: #161616;
+            --surface3: #1e1e1e;
+            --border: #242424;
+            --border2: #2e2e2e;
+            --text: #e8e8e8;
+            --text2: #888;
+            --text3: #555;
+            --accent: #f97316;
+            --accent-dim: rgba(249, 115, 22, 0.12);
+            --accent-hover: #fb923c;
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --yellow: #eab308;
+            --purple: #a855f7;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --font-ui: 'Syne', system-ui, sans-serif;
+            --radius: 6px;
+            --sidebar-w: 260px;
+        }
+
+        html,
+        body,
+        #root {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-ui);
+            font-size: 13px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: inherit;
+            font-family: inherit;
+            font-size: inherit;
+        }
+
+        input,
+        textarea,
+        select {
+            font-family: inherit;
+            font-size: inherit;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Layout */
+        .app {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-w);
+            min-width: var(--sidebar-w);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Topbar */
+        .topbar {
+            height: 44px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 12px;
+            flex-shrink: 0;
+            background: var(--surface);
+        }
+
+        .topbar-logo {
+            font-family: var(--font-ui);
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: -0.5px;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .topbar-logo svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .topbar-project {
+            font-size: 11px;
+            color: var(--text3);
+            border: 1px solid var(--border);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .topbar-spacer {
+            flex: 1;
+        }
+
+        .env-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 4px 10px;
+            font-size: 12px;
+            color: var(--text2);
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+
+        .env-selector:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        .env-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .topbar-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text2);
+            transition: all 0.15s;
+        }
+
+        .topbar-btn:hover {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        /* Sidebar header */
+        .sb-header {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .sb-tabs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .sb-tab {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text3);
+            transition: all 0.15s;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .sb-tab.active {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .sb-tab:hover:not(.active) {
+            color: var(--text2);
+            background: var(--surface2);
+        }
+
+        .sb-spacer {
+            flex: 1;
+        }
+
+        .icon-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text3);
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .icon-btn:hover {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        /* Collections */
+        .sb-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .col-item {
+            padding: 0 8px;
+            margin-bottom: 2px;
+        }
+
+        .col-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .col-header:hover {
+            background: var(--surface2);
+        }
+
+        .col-arrow {
+            color: var(--text3);
+            transition: transform 0.15s;
+            flex-shrink: 0;
+        }
+
+        .col-arrow.open {
+            transform: rotate(90deg);
+        }
+
+        .col-icon {
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .col-name {
+            flex: 1;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .col-count {
+            font-size: 10px;
+            color: var(--text3);
+            background: var(--surface3);
+            padding: 1px 6px;
+            border-radius: 8px;
+        }
+
+        .req-list {
+            padding: 2px 0 4px 0;
+        }
+
+        .req-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 8px 5px 28px;
+            margin: 0 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .req-item:hover {
+            background: var(--surface2);
+        }
+
+        .req-item.active {
+            background: var(--accent-dim);
+        }
+
+        .method-badge {
+            font-size: 9px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            width: 34px;
+            text-align: center;
+            padding: 2px 0;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .req-name {
+            flex: 1;
+            font-size: 12px;
+            color: var(--text2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .req-item.active .req-name {
+            color: var(--text);
+        }
+
+        /* Method colors */
+        .m-GET {
+            color: var(--green);
+        }
+
+        .m-POST {
+            color: var(--blue);
+        }
+
+        .m-PUT {
+            color: var(--yellow);
+        }
+
+        .m-PATCH {
+            color: var(--purple);
+        }
+
+        .m-DELETE {
+            color: var(--red);
+        }
+
+        /* Interceptor sidebar tab */
+        .intercept-list {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .intercept-item {
+            padding: 8px;
+            border-radius: 5px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+
+        .intercept-item:hover {
+            border-color: var(--border2);
+        }
+
+        .intercept-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+
+        .intercept-url {
+            font-size: 11px;
+            color: var(--text3);
+            font-family: var(--font-mono);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .intercept-empty {
+            padding: 24px 16px;
+            text-align: center;
+            color: var(--text3);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* Main area */
+        .request-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--surface);
+        }
+
+        .method-select {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            appearance: none;
+            cursor: pointer;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .method-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .url-input {
+            flex: 1;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 12px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text);
+            transition: border-color 0.15s;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .url-input::placeholder {
+            color: var(--text3);
+        }
+
+        .send-btn {
+            background: var(--accent);
+            color: white;
+            border-radius: var(--radius);
+            padding: 7px 20px;
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .send-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .send-btn:active {
+            transform: scale(0.97);
+        }
+
+        .send-btn.loading {
+            background: #7c3a10;
+            pointer-events: none;
+        }
+
+        .save-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 7px 14px;
+            font-size: 12px;
+            color: var(--text2);
+            transition: all 0.15s;
+        }
+
+        .save-btn:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        /* Tabs */
+        .req-tabs {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            flex-shrink: 0;
+            background: var(--surface);
+        }
+
+        .tab {
+            padding: 10px 12px;
+            font-size: 12px;
+            color: var(--text3);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.15s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tab:hover {
+            color: var(--text2);
+        }
+
+        .tab.active {
+            color: var(--text);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-badge {
+            font-size: 10px;
+            background: var(--surface3);
+            color: var(--text3);
+            padding: 1px 5px;
+            border-radius: 8px;
+        }
+
+        .tab.active .tab-badge {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        /* Params/Headers table */
+        .params-table {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .kv-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .kv-row:hover {
+            background: var(--surface2);
+        }
+
+        .kv-checkbox {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .kv-input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 3px;
+            padding: 4px 6px;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            transition: border-color 0.1s;
+        }
+
+        .kv-input:focus {
+            outline: none;
+            border-color: var(--border2);
+            background: var(--surface3);
+        }
+
+        .kv-input::placeholder {
+            color: var(--text3);
+        }
+
+        .kv-del {
+            color: var(--text3);
+            transition: color 0.1s;
+            padding: 2px;
+        }
+
+        .kv-del:hover {
+            color: var(--red);
+        }
+
+        .add-row-btn {
+            margin: 8px 16px;
+            padding: 5px 10px;
+            font-size: 11px;
+            color: var(--text3);
+            border: 1px dashed var(--border);
+            border-radius: 4px;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .add-row-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Body editor */
+        .body-type-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .body-type-btn {
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text3);
+            transition: all 0.15s;
+            font-weight: 500;
+        }
+
+        .body-type-btn.active {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .body-type-btn:hover:not(.active) {
+            color: var(--text2);
+        }
+
+        .body-editor {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        textarea.code {
+            flex: 1;
+            background: var(--surface2);
+            border: none;
+            padding: 12px 16px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text);
+            resize: none;
+            line-height: 1.6;
+        }
+
+        textarea.code:focus {
+            outline: none;
+        }
+
+        /* Auth panel */
+        .auth-panel {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .auth-type-select {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 10px;
+            color: var(--text);
+            width: 200px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-label {
+            font-size: 11px;
+            color: var(--text3);
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .form-input {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 7px 10px;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            transition: border-color 0.15s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Split pane */
+        .split {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .pane {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .pane-top {
+            flex: 0 0 45%;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .pane-bottom {
+            flex: 1;
+        }
+
+        .pane-inner {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Response */
+        .res-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 16px;
+            height: 40px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--surface);
+        }
+
+        .status-badge {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .s-2xx {
+            color: var(--green);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .s-3xx {
+            color: var(--blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .s-4xx {
+            color: var(--yellow);
+            background: rgba(234, 179, 8, 0.1);
+        }
+
+        .s-5xx {
+            color: var(--red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .res-meta {
+            font-size: 11px;
+            color: var(--text3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .res-meta span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .res-body {
+            flex: 1;
+            overflow: auto;
+        }
+
+        pre.response-pre {
+            padding: 12px 16px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text);
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .res-headers-table {
+            padding: 8px 0;
+        }
+
+        .res-header-row {
+            display: flex;
+            padding: 5px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
+
+        .res-header-row:hover {
+            background: var(--surface2);
+        }
+
+        .res-hkey {
+            color: var(--text3);
+            width: 200px;
+            flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .res-hval {
+            color: var(--text);
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text3);
+        }
+
+        .empty-icon {
+            font-size: 32px;
+            opacity: 0.3;
+        }
+
+        .empty-text {
+            font-size: 13px;
+        }
+
+        .empty-sub {
+            font-size: 11px;
+            color: var(--text3);
+            opacity: 0.6;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 10px;
+            width: 440px;
+            max-width: 90vw;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .modal-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .modal-footer {
+            padding: 14px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 7px 16px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-ghost {
+            background: var(--surface2);
+            color: var(--text2);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        /* Notification */
+        .notif {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--surface3);
+            border: 1px solid var(--border2);
+            border-radius: var(--radius);
+            padding: 10px 16px;
+            font-size: 12px;
+            z-index: 200;
+            animation: slideUp 0.2s ease;
+        }
+
+        .notif.success {
+            border-left: 3px solid var(--green);
+        }
+
+        .notif.error {
+            border-left: 3px solid var(--red);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(10px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* JSON coloring */
+        .json-key {
+            color: #7dd3fc;
+        }
+
+        .json-str {
+            color: #86efac;
+        }
+
+        .json-num {
+            color: #fca5a5;
+        }
+
+        .json-bool {
+            color: #fbbf24;
+        }
+
+        .json-null {
+            color: #d1d5db;
+        }
+
+        /* History */
+        .hist-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+
+        .hist-item:hover {
+            background: var(--surface2);
+        }
+
+        .hist-url {
+            flex: 1;
+            font-size: 11px;
+            color: var(--text3);
+            font-family: var(--font-mono);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .hist-time {
+            font-size: 10px;
+            color: var(--text3);
+            flex-shrink: 0;
+        }
+
+        /* Env vars */
+        .env-section {
+            padding: 12px 16px;
+        }
+
+        .env-var-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .env-secret {
+            color: var(--text3);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script>
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+        const API = window.location.origin;
+
+        // ─── Utilities ───────────────────────────────────────────────────────────────
+        function uid() { return Math.random().toString(36).slice(2, 10); }
+        function cx(...args) { return args.filter(Boolean).join(' '); }
+        function fmtSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+        function fmtTime(ms) {
+            if (ms < 1000) return ms + ' ms';
+            return (ms / 1000).toFixed(2) + ' s';
+        }
+        function timeAgo(iso) {
+            const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+            if (s < 60) return s + 's ago';
+            if (s < 3600) return Math.floor(s / 60) + 'm ago';
+            return Math.floor(s / 3600) + 'h ago';
+        }
+
+        function syntaxHighlight(json) {
+            if (typeof json !== 'string') json = JSON.stringify(json, null, 2);
+            return json
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+                    let cls = 'json-num';
+                    if (/^"/.test(m)) cls = /:$/.test(m) ? 'json-key' : 'json-str';
+                    else if (/true|false/.test(m)) cls = 'json-bool';
+                    else if (/null/.test(m)) cls = 'json-null';
+                    return `<span class="${cls}">${m}</span>`;
+                });
+        }
+
+        const METHOD_COLORS = { GET: 'var(--green)', POST: 'var(--blue)', PUT: 'var(--yellow)', PATCH: 'var(--purple)', DELETE: 'var(--red)', HEAD: 'var(--text2)', OPTIONS: 'var(--text2)' };
+
+        // ─── API calls ────────────────────────────────────────────────────────────────
+        async function apiFetch(path, opts = {}) {
+            const res = await fetch(API + path, {
+                headers: { 'Content-Type': 'application/json' },
+                ...opts,
+                body: opts.body ? JSON.stringify(opts.body) : undefined
+            });
+            return res.json();
+        }
+
+        // ─── Small components ─────────────────────────────────────────────────────────
+        function Icon({ name, size = 14, style }) {
+            const icons = {
+                plus: 'M12 5v14M5 12h14',
+                trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',
+                send: 'M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z',
+                folder: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+                chevRight: 'M9 18l6-6-6-6',
+                settings: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z',
+                history: 'M12 8v4l3 3M3.05 11a9 9 0 100 2H3',
+                zap: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
+                globe: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20',
+                copy: 'M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2M8 4a2 2 0 012-2h4a2 2 0 012 2M8 4h8',
+                x: 'M18 6L6 18M6 6l12 12',
+                check: 'M20 6L9 17l-5-5',
+                eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 100 6 3 3 0 000-6z',
+                eyeOff: 'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22',
+                save: 'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+            };
+            return React.createElement('svg', {
+                xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+                fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', style
+            }, React.createElement('path', { d: icons[name] || '' }));
+        }
+
+        function MethodBadge({ method }) {
+            return React.createElement('span', {
+                className: `method-badge m-${method}`,
+                style: { background: METHOD_COLORS[method] ? METHOD_COLORS[method].replace('var(--', 'rgba(').replace(')', ',0.12)') : 'transparent' }
+            }, method);
+        }
+
+        // ─── KV Table (Params / Headers) ─────────────────────────────────────────────
+        function KVTable({ rows, onChange, placeholder = ['Key', 'Value'] }) {
+            const update = (i, field, val) => {
+                const next = rows.map((r, j) => j === i ? { ...r, [field]: val } : r);
+                onChange(next);
+            };
+            const del = i => onChange(rows.filter((_, j) => j !== i));
+            const add = () => onChange([...rows, { id: uid(), key: '', value: '', enabled: true }]);
+
+            return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', flex: 1 } },
+                React.createElement('div', { className: 'params-table' },
+                    rows.map((r, i) =>
+                        React.createElement('div', { key: r.id || i, className: 'kv-row' },
+                            React.createElement('input', { type: 'checkbox', className: 'kv-checkbox', checked: r.enabled, onChange: e => update(i, 'enabled', e.target.checked) }),
+                            React.createElement('input', { className: 'kv-input', placeholder: placeholder[0], value: r.key || '', onChange: e => update(i, 'key', e.target.value) }),
+                            React.createElement('input', { className: 'kv-input', placeholder: placeholder[1], value: r.value || '', onChange: e => update(i, 'value', e.target.value) }),
+                            React.createElement('button', { className: 'kv-del icon-btn', onClick: () => del(i) }, React.createElement(Icon, { name: 'x', size: 12 }))
+                        )
+                    )
+                ),
+                React.createElement('button', { className: 'add-row-btn', onClick: add },
+                    React.createElement(Icon, { name: 'plus', size: 12 }), ' Add Row'
+                )
+            );
+        }
+
+        // ─── Auth Panel ───────────────────────────────────────────────────────────────
+        function AuthPanel({ auth, onChange }) {
+            const set = (k, v) => onChange({ ...auth, [k]: v });
+            return React.createElement('div', { className: 'auth-panel' },
+                React.createElement('div', { className: 'form-group' },
+                    React.createElement('label', { className: 'form-label' }, 'Auth Type'),
+                    React.createElement('select', { className: 'auth-type-select', value: auth.type || 'none', onChange: e => set('type', e.target.value) },
+                        ['none', 'bearer', 'basic', 'apikey'].map(t => React.createElement('option', { key: t, value: t },
+                            { none: 'No Auth', bearer: 'Bearer Token', basic: 'Basic Auth', apikey: 'API Key' }[t]
+                        ))
+                    )
+                ),
+                auth.type === 'bearer' && React.createElement('div', { className: 'form-group' },
+                    React.createElement('label', { className: 'form-label' }, 'Token'),
+                    React.createElement('input', { className: 'form-input', placeholder: 'Bearer token...', value: auth.token || '', onChange: e => set('token', e.target.value) })
+                ),
+                auth.type === 'basic' && React.createElement(React.Fragment, null,
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'form-label' }, 'Username'),
+                        React.createElement('input', { className: 'form-input', value: auth.username || '', onChange: e => set('username', e.target.value) })
+                    ),
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'form-label' }, 'Password'),
+                        React.createElement('input', { className: 'form-input', type: 'password', value: auth.password || '', onChange: e => set('password', e.target.value) })
+                    )
+                ),
+                auth.type === 'apikey' && React.createElement(React.Fragment, null,
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'form-label' }, 'Key Name'),
+                        React.createElement('input', { className: 'form-input', placeholder: 'X-API-Key', value: auth.key || '', onChange: e => set('key', e.target.value) })
+                    ),
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'form-label' }, 'Value'),
+                        React.createElement('input', { className: 'form-input', value: auth.value || '', onChange: e => set('value', e.target.value) })
+                    ),
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'form-label' }, 'Send In'),
+                        React.createElement('select', { className: 'auth-type-select', value: auth.placement || 'header', onChange: e => set('placement', e.target.value) },
+                            React.createElement('option', { value: 'header' }, 'Header'),
+                            React.createElement('option', { value: 'query' }, 'Query Param')
+                        )
+                    )
+                )
+            );
+        }
+
+        // ─── Body Panel ───────────────────────────────────────────────────────────────
+        function BodyPanel({ body, onChange }) {
+            const set = (k, v) => onChange({ ...body, [k]: v });
+            const types = ['none', 'json', 'text', 'form', 'raw'];
+            return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' } },
+                React.createElement('div', { className: 'body-type-bar' },
+                    types.map(t => React.createElement('button', {
+                        key: t, className: cx('body-type-btn', body.type === t && 'active'), onClick: () => set('type', t)
+                    }, t.charAt(0).toUpperCase() + t.slice(1)))
+                ),
+                body.type === 'none' && React.createElement('div', { className: 'empty-state' },
+                    React.createElement('div', { className: 'empty-text' }, 'This request has no body')
+                ),
+                body.type === 'form' && React.createElement(KVTable, {
+                    rows: body.fields || [], onChange: v => set('fields', v),
+                    placeholder: ['Field name', 'Value']
+                }),
+                (body.type === 'json' || body.type === 'text' || body.type === 'raw') && React.createElement('textarea', {
+                    className: 'code', style: { flex: 1 }, placeholder:
+                        body.type === 'json' ? '{\n  "key": "value"\n}' : body.type === 'text' ? 'Plain text body...' : 'Raw body...',
+                    value: body.content || '', onChange: e => set('content', e.target.value)
+                })
+            );
+        }
+
+        // ─── Response Panel ───────────────────────────────────────────────────────────
+        function ResponsePanel({ response, loading }) {
+            const [resTab, setResTab] = useState('body');
+
+            if (loading) return React.createElement('div', { className: 'empty-state' },
+                React.createElement('div', { className: 'spinner', style: { width: 24, height: 24, borderWidth: 3 } }),
+                React.createElement('div', { className: 'empty-text', style: { marginTop: 12 } }, 'Sending request...')
+            );
+
+            if (!response) return React.createElement('div', { className: 'empty-state' },
+                React.createElement('div', { className: 'empty-icon' }, '⚡'),
+                React.createElement('div', { className: 'empty-text' }, 'Hit Send to make a request'),
+                React.createElement('div', { className: 'empty-sub' }, 'Response will appear here')
+            );
+
+            if (response.error) return React.createElement('div', { className: 'empty-state' },
+                React.createElement('div', { className: 'empty-icon', style: { color: 'var(--red)' } }, '✕'),
+                React.createElement('div', { className: 'empty-text', style: { color: 'var(--red)' } }, response.error),
+                response.code && React.createElement('div', { className: 'empty-sub' }, response.code)
+            );
+
+            const statusClass = response.status < 300 ? 's-2xx' : response.status < 400 ? 's-3xx' : response.status < 500 ? 's-4xx' : 's-5xx';
+            let bodyDisplay;
+            if (response.bodyType === 'json') {
+                try {
+                    const parsed = JSON.parse(response.body);
+                    bodyDisplay = React.createElement('pre', {
+                        className: 'response-pre',
+                        dangerouslySetInnerHTML: { __html: syntaxHighlight(JSON.stringify(parsed, null, 2)) }
+                    });
+                } catch {
+                    bodyDisplay = React.createElement('pre', { className: 'response-pre' }, response.body);
+                }
+            } else {
+                bodyDisplay = React.createElement('pre', { className: 'response-pre' }, response.body);
+            }
+
+            const copyBody = () => {
+                navigator.clipboard.writeText(response.body || '');
+                showNotif('Copied to clipboard', 'success');
+            };
+
+            return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' } },
+                React.createElement('div', { className: 'res-header' },
+                    React.createElement('span', { className: `status-badge ${statusClass}` }, `${response.status} ${response.statusText || ''}`),
+                    React.createElement('div', { className: 'res-meta' },
+                        React.createElement('span', null, React.createElement(Icon, { name: 'zap', size: 11 }), ' ', fmtTime(response.elapsed)),
+                        React.createElement('span', null, fmtSize(response.size || 0))
+                    ),
+                    React.createElement('div', { style: { flex: 1 } }),
+                    React.createElement('button', { className: 'icon-btn', onClick: copyBody, title: 'Copy response' }, React.createElement(Icon, { name: 'copy', size: 13 }))
+                ),
+                React.createElement('div', { className: 'req-tabs' },
+                    ['body', 'headers'].map(t => React.createElement('button', {
+                        key: t, className: cx('tab', resTab === t && 'active'), onClick: () => setResTab(t)
+                    }, t.charAt(0).toUpperCase() + t.slice(1),
+                        t === 'headers' && React.createElement('span', { className: 'tab-badge' },
+                            Object.keys(response.headers || {}).length
+                        )
+                    ))
+                ),
+                React.createElement('div', { className: 'res-body' },
+                    resTab === 'body' ? bodyDisplay :
+                        React.createElement('div', { className: 'res-headers-table' },
+                            Object.entries(response.headers || {}).map(([k, v]) =>
+                                React.createElement('div', { key: k, className: 'res-header-row' },
+                                    React.createElement('span', { className: 'res-hkey' }, k),
+                                    React.createElement('span', { className: 'res-hval' }, v)
+                                )
+                            )
+                        )
+                )
+            );
+        }
+
+        // Global notif fn
+        let _showNotif;
+        function showNotif(msg, type = 'success') { _showNotif && _showNotif(msg, type); }
+
+        // ─── Main App ─────────────────────────────────────────────────────────────────
+        function App() {
+            const [collections, setCollections] = useState([]);
+            const [environments, setEnvironments] = useState([]);
+            const [activeEnv, setActiveEnv] = useState(null);
+            const [history, setHistory] = useState([]);
+            const [config, setConfig] = useState({ name: 'Workspace', isProjectMode: false });
+
+            const [sbTab, setSbTab] = useState('collections'); // collections | history | interceptor
+            const [expandedCols, setExpandedCols] = useState({});
+            const [activeReq, setActiveReq] = useState(null); // {colId, reqId}
+
+            // Request state
+            const [method, setMethod] = useState('GET');
+            const [url, setUrl] = useState('');
+            const [reqTab, setReqTab] = useState('params');
+            const [params, setParams] = useState([{ id: uid(), key: '', value: '', enabled: true }]);
+            const [headers, setHeaders] = useState([{ id: uid(), key: '', value: '', enabled: true }]);
+            const [body, setBody] = useState({ type: 'none', content: '', fields: [] });
+            const [auth, setAuth] = useState({ type: 'none' });
+            const [reqName, setReqName] = useState('');
+
+            // Response
+            const [response, setResponse] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            // UI state
+            const [notif, setNotif] = useState(null);
+            const [modal, setModal] = useState(null); // {type: 'newCollection'|'newEnvironment'}
+            const [modalForm, setModalForm] = useState({});
+            const [intercepted, setIntercepted] = useState([]);
+            const [showSettings, setShowSettings] = useState(false);
+            const [settingsForm, setSettingsForm] = useState({});
+            const [envEditId, setEnvEditId] = useState(null);
+
+            _showNotif = (msg, type) => {
+                setNotif({ msg, type });
+                setTimeout(() => setNotif(null), 2500);
+            };
+
+            // Load initial data
+            useEffect(() => {
+                Promise.all([
+                    apiFetch('/api/collections'), apiFetch('/api/environments'),
+                    apiFetch('/api/history?limit=30'), apiFetch('/api/config')
+                ]).then(([cols, envs, hist, cfg]) => {
+                    setCollections(cols);
+                    setEnvironments(envs);
+                    setHistory(hist);
+                    setConfig(cfg);
+                    if (envs.length > 0) setActiveEnv(envs[0]);
+                    if (cols.length > 0) setExpandedCols({ [cols[0].id]: true });
+                }).catch(() => { });
+
+                // WebSocket for interceptor
+                const ws = new WebSocket(`ws://${window.location.host}/ws?type=ui`);
+                ws.onmessage = (e) => {
+                    try {
+                        const msg = JSON.parse(e.data);
+                        if (msg.type === 'intercepted') {
+                            setIntercepted(prev => [msg.data, ...prev].slice(0, 100));
+                            showNotif('Request intercepted', 'success');
+                        }
+                    } catch { }
+                };
+                return () => ws.close();
+            }, []);
+
+            const envVars = useMemo(() => {
+                if (!activeEnv) return {};
+                return Object.fromEntries(
+                    (activeEnv.variables || []).filter(v => v.enabled).map(v => [v.key, v.value])
+                );
+            }, [activeEnv]);
+
+            const loadRequest = (col, req) => {
+                setActiveReq({ colId: col.id, reqId: req.id });
+                setMethod(req.method || 'GET');
+                setUrl(req.url || '');
+                setParams(req.params?.length ? req.params : [{ id: uid(), key: '', value: '', enabled: true }]);
+                setHeaders(req.headers?.length ? req.headers : [{ id: uid(), key: '', value: '', enabled: true }]);
+                setBody(req.body || { type: 'none', content: '', fields: [] });
+                setAuth(req.auth || { type: 'none' });
+                setReqName(req.name || '');
+                setResponse(null);
+            };
+
+            const sendRequest = async () => {
+                if (!url.trim()) { showNotif('Enter a URL first', 'error'); return; }
+                setLoading(true); setResponse(null);
+                try {
+                    const res = await apiFetch('/api/execute', {
+                        method: 'POST', body: {
+                            method, url: url.trim(), headers, params, body, auth,
+                            environment: envVars, saveToHistory: true
+                        }
+                    });
+                    setResponse(res);
+                    // Refresh history
+                    apiFetch('/api/history?limit=30').then(setHistory).catch(() => { });
+                } catch (e) {
+                    setResponse({ error: e.message });
+                }
+                setLoading(false);
+            };
+
+            const saveRequest = async () => {
+                if (!activeReq) {
+                    // Save as new — open modal or pick collection
+                    if (collections.length === 0) { showNotif('Create a collection first', 'error'); return; }
+                    const col = collections[0];
+                    const req = await apiFetch(`/api/collections/${col.id}/requests`, {
+                        method: 'POST', body: { name: reqName || url || 'New Request', method, url, params, headers, body, auth }
+                    });
+                    setCollections(await apiFetch('/api/collections'));
+                    setActiveReq({ colId: col.id, reqId: req.id });
+                    showNotif('Request saved', 'success');
+                } else {
+                    await apiFetch(`/api/collections/${activeReq.colId}/requests/${activeReq.reqId}`, {
+                        method: 'PUT', body: { name: reqName, method, url, params, headers, body, auth }
+                    });
+                    setCollections(await apiFetch('/api/collections'));
+                    showNotif('Saved', 'success');
+                }
+            };
+
+            const createCollection = async () => {
+                if (!modalForm.name) return;
+                await apiFetch('/api/collections', { method: 'POST', body: { name: modalForm.name, description: modalForm.desc || '' } });
+                setCollections(await apiFetch('/api/collections'));
+                setModal(null); setModalForm({});
+                showNotif('Collection created', 'success');
+            };
+
+            const deleteCollection = async (id, e) => {
+                e.stopPropagation();
+                await apiFetch(`/api/collections/${id}`, { method: 'DELETE' });
+                setCollections(await apiFetch('/api/collections'));
+                showNotif('Deleted', 'success');
+            };
+
+            const addReqToCollection = async (colId) => {
+                const req = await apiFetch(`/api/collections/${colId}/requests`, {
+                    method: 'POST', body: { name: 'New Request', method: 'GET', url: '' }
+                });
+                setCollections(await apiFetch('/api/collections'));
+                const cols = await apiFetch('/api/collections');
+                setCollections(cols);
+                const col = cols.find(c => c.id === colId);
+                if (col) { loadRequest(col, req); setExpandedCols(p => ({ ...p, [colId]: true })); }
+            };
+
+            const newRequest = () => {
+                setActiveReq(null);
+                setMethod('GET'); setUrl(''); setReqName('');
+                setParams([{ id: uid(), key: '', value: '', enabled: true }]);
+                setHeaders([{ id: uid(), key: '', value: '', enabled: true }]);
+                setBody({ type: 'none', content: '', fields: [] });
+                setAuth({ type: 'none' }); setResponse(null);
+            };
+
+            const loadFromHistory = (h) => {
+                setMethod(h.request.method || 'GET');
+                setUrl(h.response.finalUrl || h.request.url || '');
+                setResponse(h.response);
+                setActiveReq(null);
+            };
+
+            const loadIntercepted = (item) => {
+                setMethod(item.method || 'GET');
+                setUrl(item.url || '');
+                const hdrs = Object.entries(item.requestHeaders || {}).map(([k, v]) => ({ id: uid(), key: k, value: v, enabled: true }));
+                setHeaders(hdrs.length ? hdrs : [{ id: uid(), key: '', value: '', enabled: true }]);
+                setBody(item.requestBody ? { type: 'text', content: item.requestBody } : { type: 'none', content: '' });
+                setReqName(item.url || 'Intercepted');
+                setResponse(null);
+                setSbTab('collections');
+            };
+
+            const enabledCount = (arr) => arr.filter(r => r.enabled && r.key).length;
+
+            // ─── Sidebar ──────────────────────────────────────────────────────────────
+            const Sidebar = React.createElement('div', { className: 'sidebar' },
+                // Tab bar
+                React.createElement('div', { className: 'sb-header' },
+                    React.createElement('div', { className: 'sb-tabs' },
+                        ['collections', 'history', 'interceptor'].map(t =>
+                            React.createElement('button', { key: t, className: cx('sb-tab', sbTab === t && 'active'), onClick: () => setSbTab(t) },
+                                { collections: 'Cols', history: 'Hist', interceptor: 'Tap' }[t]
+                            )
+                        )
+                    ),
+                    React.createElement('div', { className: 'sb-spacer' }),
+                    sbTab === 'collections' && React.createElement('button', {
+                        className: 'icon-btn', title: 'New Collection',
+                        onClick: () => { setModal('newCollection'); setModalForm({}); }
+                    }, React.createElement(Icon, { name: 'plus', size: 14 })),
+                    sbTab === 'collections' && React.createElement('button', {
+                        className: 'icon-btn', title: 'New Request', onClick: newRequest
+                    }, React.createElement(Icon, { name: 'zap', size: 14 }))
+                ),
+
+                // Collections
+                sbTab === 'collections' && React.createElement('div', { className: 'sb-content' },
+                    collections.length === 0 && React.createElement('div', { className: 'intercept-empty' },
+                        'No collections yet.', React.createElement('br'),
+                        React.createElement('button', {
+                            style: { color: 'var(--accent)', marginTop: 8, textDecoration: 'underline' },
+                            onClick: () => { setModal('newCollection'); setModalForm({}); }
+                        }, 'Create one')
+                    ),
+                    collections.map(col =>
+                        React.createElement('div', { key: col.id, className: 'col-item' },
+                            React.createElement('div', {
+                                className: 'col-header',
+                                onClick: () => setExpandedCols(p => ({ ...p, [col.id]: !p[col.id] }))
+                            },
+                                React.createElement('span', { className: cx('col-arrow', expandedCols[col.id] && 'open') },
+                                    React.createElement(Icon, { name: 'chevRight', size: 12 })
+                                ),
+                                React.createElement(Icon, { name: 'folder', size: 13, style: { color: 'var(--accent)' } }),
+                                React.createElement('span', { className: 'col-name' }, col.name),
+                                React.createElement('button', {
+                                    className: 'icon-btn', style: { opacity: 0.6 },
+                                    onClick: e => { e.stopPropagation(); addReqToCollection(col.id); },
+                                    title: 'Add request'
+                                }, React.createElement(Icon, { name: 'plus', size: 11 })),
+                                React.createElement('button', {
+                                    className: 'icon-btn', style: { opacity: 0.5 },
+                                    onClick: e => deleteCollection(col.id, e), title: 'Delete'
+                                }, React.createElement(Icon, { name: 'trash', size: 11 }))
+                            ),
+                            expandedCols[col.id] && React.createElement('div', { className: 'req-list' },
+                                (col.requests || []).map(req =>
+                                    React.createElement('div', {
+                                        key: req.id,
+                                        className: cx('req-item', activeReq?.colId === col.id && activeReq?.reqId === req.id && 'active'),
+                                        onClick: () => loadRequest(col, req)
+                                    },
+                                        React.createElement(MethodBadge, { method: req.method || 'GET' }),
+                                        React.createElement('span', { className: 'req-name' }, req.name || req.url || 'Unnamed')
+                                    )
+                                ),
+                                col.requests?.length === 0 && React.createElement('div', {
+                                    style: { padding: '6px 28px', fontSize: 11, color: 'var(--text3)' }
+                                }, 'No requests yet')
+                            )
+                        )
+                    )
+                ),
+
+                // History
+                sbTab === 'history' && React.createElement('div', { className: 'sb-content' },
+                    history.length === 0
+                        ? React.createElement('div', { className: 'intercept-empty' }, 'No history yet')
+                        : history.map(h =>
+                            React.createElement('div', { key: h.id, className: 'hist-item', onClick: () => loadFromHistory(h) },
+                                React.createElement(MethodBadge, { method: h.request.method || 'GET' }),
+                                React.createElement('span', { className: `status-badge s-${Math.floor((h.response?.status || 0) / 100)}xx`, style: { fontSize: 10 } }, h.response?.status),
+                                React.createElement('span', { className: 'hist-url' }, h.request.url || ''),
+                                React.createElement('span', { className: 'hist-time' }, timeAgo(h.timestamp))
+                            )
+                        )
+                ),
+
+                // Interceptor
+                sbTab === 'interceptor' && React.createElement('div', { className: 'sb-content' },
+                    React.createElement('div', { className: 'intercept-empty', style: { borderBottom: '1px solid var(--border)', paddingBottom: 12 } },
+                        React.createElement('strong', { style: { color: 'var(--text2)', display: 'block', marginBottom: 6 } }, 'Browser Interceptor'),
+                        React.createElement('span', { style: { fontSize: 11 } },
+                            'Install the consolio Chrome extension to capture browser requests in real time.'
+                        )
+                    ),
+                    intercepted.length === 0
+                        ? React.createElement('div', { className: 'intercept-empty', style: { marginTop: 16 } }, 'Waiting for intercepted requests...')
+                        : React.createElement('div', { className: 'intercept-list' },
+                            intercepted.map((item, i) =>
+                                React.createElement('div', { key: i, className: 'intercept-item', onClick: () => loadIntercepted(item) },
+                                    React.createElement('div', { className: 'intercept-meta' },
+                                        React.createElement(MethodBadge, { method: item.method || 'GET' }),
+                                        React.createElement('span', { className: 'hist-time' }, timeAgo(item.timestamp || new Date().toISOString()))
+                                    ),
+                                    React.createElement('div', { className: 'intercept-url' }, item.url)
+                                )
+                            )
+                        )
+                )
+            );
+
+            // ─── Main ─────────────────────────────────────────────────────────────────
+            const Main = React.createElement('div', { className: 'main' },
+                // Topbar
+                React.createElement('div', { className: 'topbar' },
+                    React.createElement('div', { className: 'topbar-logo' },
+                        React.createElement(Icon, { name: 'zap', size: 18 }), 'consolio'
+                    ),
+                    React.createElement('span', { className: 'topbar-project' },
+                        config.isProjectMode ? '📁 ' + config.name : '🌐 Global'
+                    ),
+                    React.createElement('div', { className: 'topbar-spacer' }),
+                    // Env selector
+                    React.createElement('div', { className: 'env-selector' },
+                        activeEnv
+                            ? [React.createElement('span', { key: 'd', className: 'env-dot', style: { background: activeEnv.color || 'var(--accent)' } }),
+                            activeEnv.name]
+                            : 'No Environment'
+                    ),
+                    React.createElement('button', {
+                        className: 'topbar-btn', title: 'Settings',
+                        onClick: () => { setSettingsForm({ ...config }); setShowSettings(true); }
+                    }, React.createElement(Icon, { name: 'settings', size: 15 }))
+                ),
+
+                // Request bar
+                React.createElement('div', { className: 'request-bar' },
+                    React.createElement('select', {
+                        className: 'method-select', value: method,
+                        onChange: e => setMethod(e.target.value),
+                        style: { color: METHOD_COLORS[method] || 'var(--text)' }
+                    },
+                        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(m =>
+                            React.createElement('option', { key: m, value: m }, m)
+                        )
+                    ),
+                    React.createElement('input', {
+                        className: 'url-input', placeholder: 'https://api.example.com/endpoint  (use {{VAR}} for env vars)',
+                        value: url, onChange: e => setUrl(e.target.value),
+                        onKeyDown: e => e.key === 'Enter' && sendRequest()
+                    }),
+                    React.createElement('button', { className: 'save-btn', onClick: saveRequest },
+                        React.createElement(Icon, { name: 'save', size: 13 }), ' Save'
+                    ),
+                    React.createElement('button', {
+                        className: cx('send-btn', loading && 'loading'), onClick: sendRequest
+                    },
+                        loading
+                            ? [React.createElement('span', { key: 's', className: 'spinner' }), 'Sending...']
+                            : [React.createElement(Icon, { key: 'i', name: 'send', size: 13 }), ' Send']
+                    )
+                ),
+
+                // Split: req tabs + response
+                React.createElement('div', { className: 'split' },
+                    // Request tabs pane
+                    React.createElement('div', { className: 'pane pane-top' },
+                        React.createElement('div', { className: 'req-tabs' },
+                            [
+                                ['params', `Params${enabledCount(params) ? ` (${enabledCount(params)})` : ''}`, null],
+                                ['headers', `Headers${enabledCount(headers) ? ` (${enabledCount(headers)})` : ''}`, null],
+                                ['body', 'Body', null],
+                                ['auth', 'Auth', null]
+                            ].map(([t, label]) =>
+                                React.createElement('button', { key: t, className: cx('tab', reqTab === t && 'active'), onClick: () => setReqTab(t) }, label)
+                            ),
+                            React.createElement('div', { style: { flex: 1 } }),
+                            activeReq && React.createElement('input', {
+                                style: { background: 'transparent', border: 'none', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--font-mono)', textAlign: 'right', paddingRight: 8 },
+                                value: reqName, onChange: e => setReqName(e.target.value), placeholder: 'Request name...'
+                            })
+                        ),
+                        React.createElement('div', { className: 'pane-inner' },
+                            reqTab === 'params' && React.createElement(KVTable, { rows: params, onChange: setParams, placeholder: ['Parameter', 'Value'] }),
+                            reqTab === 'headers' && React.createElement(KVTable, { rows: headers, onChange: setHeaders, placeholder: ['Header', 'Value'] }),
+                            reqTab === 'body' && React.createElement(BodyPanel, { body, onChange: setBody }),
+                            reqTab === 'auth' && React.createElement(AuthPanel, { auth, onChange: setAuth })
+                        )
+                    ),
+
+                    // Response pane
+                    React.createElement('div', { className: 'pane pane-bottom' },
+                        React.createElement('div', { style: { height: 36, borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', paddingLeft: 16, fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' } }, 'Response'),
+                        React.createElement('div', { className: 'pane-inner' },
+                            React.createElement(ResponsePanel, { response, loading })
+                        )
+                    )
+                )
+            );
+
+            // ─── Modal ────────────────────────────────────────────────────────────────
+            const Modal = modal && React.createElement('div', { className: 'modal-overlay', onClick: () => setModal(null) },
+                React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() },
+                    React.createElement('div', { className: 'modal-header' },
+                        React.createElement('span', { className: 'modal-title' },
+                            modal === 'newCollection' ? 'New Collection' : 'New Environment'
+                        ),
+                        React.createElement('button', { className: 'icon-btn', onClick: () => setModal(null) }, React.createElement(Icon, { name: 'x', size: 14 }))
+                    ),
+                    React.createElement('div', { className: 'modal-body' },
+                        React.createElement('div', { className: 'form-group' },
+                            React.createElement('label', { className: 'form-label' }, 'Name'),
+                            React.createElement('input', {
+                                className: 'form-input', autoFocus: true,
+                                placeholder: modal === 'newCollection' ? 'My API Collection' : 'Development',
+                                value: modalForm.name || '', onChange: e => setModalForm(f => ({ ...f, name: e.target.value })),
+                                onKeyDown: e => e.key === 'Enter' && createCollection()
+                            })
+                        ),
+                        modal === 'newCollection' && React.createElement('div', { className: 'form-group' },
+                            React.createElement('label', { className: 'form-label' }, 'Description (optional)'),
+                            React.createElement('input', {
+                                className: 'form-input', placeholder: 'What APIs does this test?',
+                                value: modalForm.desc || '', onChange: e => setModalForm(f => ({ ...f, desc: e.target.value }))
+                            })
+                        )
+                    ),
+                    React.createElement('div', { className: 'modal-footer' },
+                        React.createElement('button', { className: 'btn btn-ghost', onClick: () => setModal(null) }, 'Cancel'),
+                        React.createElement('button', { className: 'btn btn-primary', onClick: createCollection }, 'Create')
+                    )
+                )
+            );
+
+            // ── Settings Modal ──────────────────────────────────────────────────────────
+            const saveSettings = async () => {
+                await apiFetch('/api/config', { method: 'PUT', body: settingsForm });
+                setConfig(c => ({ ...c, ...settingsForm }));
+                setShowSettings(false);
+                showNotif('Settings saved', 'success');
+            };
+
+            const saveEnv = async () => {
+                if (!settingsForm._envName) return;
+                const existing = environments.find(e => e.id === envEditId);
+                if (existing) {
+                    await apiFetch(`/api/environments/${existing.id}`, { method: 'PUT', body: { ...existing, name: settingsForm._envName, color: settingsForm._envColor || '#6366f1', variables: settingsForm._envVars || [] } });
+                } else {
+                    const created = await apiFetch('/api/environments', { method: 'POST', body: { name: settingsForm._envName, color: settingsForm._envColor || '#6366f1', variables: settingsForm._envVars || [] } });
+                    setActiveEnv(created);
+                }
+                const envs = await apiFetch('/api/environments');
+                setEnvironments(envs);
+                setEnvEditId(null);
+                setSettingsForm(f => ({ ...f, _envName: '', _envColor: '', _envVars: [] }));
+                showNotif('Environment saved', 'success');
+            };
+
+            const startEditEnv = (env) => {
+                setEnvEditId(env.id);
+                setSettingsForm(f => ({ ...f, _envName: env.name, _envColor: env.color || '#6366f1', _envVars: [...(env.variables || [])] }));
+            };
+
+            const startNewEnv = () => {
+                setEnvEditId('__new__');
+                setSettingsForm(f => ({ ...f, _envName: '', _envColor: '#6366f1', _envVars: [{ id: uid(), key: '', value: '', enabled: true, secret: false }] }));
+            };
+
+            const deleteEnv = async (id) => {
+                await apiFetch(`/api/environments/${id}`, { method: 'DELETE' });
+                const envs = await apiFetch('/api/environments');
+                setEnvironments(envs);
+                if (activeEnv?.id === id) setActiveEnv(envs[0] || null);
+                showNotif('Environment deleted', 'success');
+            };
+
+            const SettingsModal = showSettings && React.createElement('div', {
+                className: 'modal-overlay', onClick: () => { setShowSettings(false); setEnvEditId(null); }
+            },
+                React.createElement('div', { className: 'modal', style: { width: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }, onClick: e => e.stopPropagation() },
+                    React.createElement('div', { className: 'modal-header' },
+                        React.createElement('span', { className: 'modal-title' }, '⚙  Settings'),
+                        React.createElement('button', { className: 'icon-btn', onClick: () => setShowSettings(false) }, React.createElement(Icon, { name: 'x', size: 14 }))
+                    ),
+                    React.createElement('div', { style: { flex: 1, overflowY: 'auto', padding: '0 20px 20px' } },
+                        // Project settings
+                        React.createElement('div', { style: { marginTop: 20 } },
+                            React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 12 } }, 'Project'),
+                            React.createElement('div', { className: 'form-group', style: { marginBottom: 10 } },
+                                React.createElement('label', { className: 'form-label' }, 'Project Name'),
+                                React.createElement('input', { className: 'form-input', value: settingsForm.name || '', onChange: e => setSettingsForm(f => ({ ...f, name: e.target.value })) })
+                            ),
+                            React.createElement('div', { style: { display: 'flex', gap: 20 } },
+                                React.createElement('div', { className: 'form-group', style: { flex: 1 } },
+                                    React.createElement('label', { className: 'form-label' }, 'Request Timeout (ms)'),
+                                    React.createElement('input', {
+                                        className: 'form-input', type: 'number', value: settingsForm.settings?.timeout || 30000,
+                                        onChange: e => setSettingsForm(f => ({ ...f, settings: { ...(f.settings || {}), timeout: parseInt(e.target.value) } }))
+                                    })
+                                ),
+                                React.createElement('div', { className: 'form-group', style: { flex: 1 } },
+                                    React.createElement('label', { className: 'form-label' }, 'SSL Verify'),
+                                    React.createElement('select', {
+                                        className: 'form-input', value: String(settingsForm.settings?.sslVerify !== false),
+                                        onChange: e => setSettingsForm(f => ({ ...f, settings: { ...(f.settings || {}), sslVerify: e.target.value === 'true' } }))
+                                    },
+                                        React.createElement('option', { value: 'true' }, 'Enabled'),
+                                        React.createElement('option', { value: 'false' }, 'Disabled')
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: 'form-group', style: { marginTop: 10 } },
+                                React.createElement('label', { className: 'form-label' }, 'Follow Redirects'),
+                                React.createElement('select', {
+                                    className: 'form-input', style: { width: 200 }, value: String(settingsForm.settings?.followRedirects !== false),
+                                    onChange: e => setSettingsForm(f => ({ ...f, settings: { ...(f.settings || {}), followRedirects: e.target.value === 'true' } }))
+                                },
+                                    React.createElement('option', { value: 'true' }, 'Yes'),
+                                    React.createElement('option', { value: 'false' }, 'No')
+                                )
+                            )
+                        ),
+
+                        // Environments
+                        React.createElement('div', { style: { marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 } },
+                            React.createElement('div', { style: { display: 'flex', alignItems: 'center', marginBottom: 12 } },
+                                React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', flex: 1 } }, 'Environments'),
+                                React.createElement('button', { className: 'btn btn-ghost', style: { padding: '4px 10px', fontSize: 11 }, onClick: startNewEnv }, '+ New')
+                            ),
+                            environments.map(env =>
+                                React.createElement('div', { key: env.id, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 5, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 6 } },
+                                    React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', background: env.color || '#6366f1', flexShrink: 0 } }),
+                                    React.createElement('span', { style: { flex: 1, fontSize: 12 } }, env.name),
+                                    activeEnv?.id === env.id && React.createElement('span', { style: { fontSize: 10, color: 'var(--green)', background: 'rgba(34,197,94,0.1)', padding: '1px 6px', borderRadius: 8 } }, 'active'),
+                                    React.createElement('button', { className: 'icon-btn', style: { opacity: 0.7 }, onClick: () => { setActiveEnv(env); showNotif(`Switched to ${env.name}`, 'success'); } }, '✓'),
+                                    React.createElement('button', { className: 'icon-btn', onClick: () => startEditEnv(env) }, React.createElement(Icon, { name: 'settings', size: 12 })),
+                                    React.createElement('button', { className: 'icon-btn', style: { color: 'var(--red)' }, onClick: () => deleteEnv(env.id) }, React.createElement(Icon, { name: 'trash', size: 12 }))
+                                )
+                            ),
+                            environments.length === 0 && React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', padding: '8px 0' } }, 'No environments yet'),
+
+                            // Inline env editor
+                            envEditId && React.createElement('div', { style: { marginTop: 14, padding: 14, background: 'var(--surface3)', border: '1px solid var(--border2)', borderRadius: 6 } },
+                                React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 } },
+                                    envEditId === '__new__' ? 'New Environment' : 'Edit Environment'
+                                ),
+                                React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 10 } },
+                                    React.createElement('input', {
+                                        className: 'form-input', placeholder: 'Environment name', style: { flex: 1 },
+                                        value: settingsForm._envName || '', onChange: e => setSettingsForm(f => ({ ...f, _envName: e.target.value }))
+                                    }),
+                                    React.createElement('input', {
+                                        type: 'color', value: settingsForm._envColor || '#6366f1',
+                                        style: { width: 40, height: 36, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface2)', cursor: 'pointer', padding: 2 },
+                                        onChange: e => setSettingsForm(f => ({ ...f, _envColor: e.target.value }))
+                                    })
+                                ),
+                                React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', marginBottom: 6, fontWeight: 600 } }, 'Variables'),
+                                (settingsForm._envVars || []).map((v, i) =>
+                                    React.createElement('div', { key: v.id || i, style: { display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 } },
+                                        React.createElement('input', {
+                                            type: 'checkbox', style: { accentColor: 'var(--accent)' }, checked: v.enabled,
+                                            onChange: e => setSettingsForm(f => ({ ...f, _envVars: f._envVars.map((x, j) => j === i ? { ...x, enabled: e.target.checked } : x) }))
+                                        }),
+                                        React.createElement('input', {
+                                            className: 'kv-input', placeholder: 'KEY', value: v.key || '',
+                                            onChange: e => setSettingsForm(f => ({ ...f, _envVars: f._envVars.map((x, j) => j === i ? { ...x, key: e.target.value } : x) }))
+                                        }),
+                                        React.createElement('input', {
+                                            className: 'kv-input', placeholder: 'Value', type: v.secret ? 'password' : 'text', value: v.value || '',
+                                            onChange: e => setSettingsForm(f => ({ ...f, _envVars: f._envVars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))
+                                        }),
+                                        React.createElement('button', {
+                                            className: 'icon-btn', style: { fontSize: 10, color: 'var(--text3)' },
+                                            title: v.secret ? 'Mark as plain' : 'Mark as secret',
+                                            onClick: () => setSettingsForm(f => ({ ...f, _envVars: f._envVars.map((x, j) => j === i ? { ...x, secret: !x.secret } : x) }))
+                                        },
+                                            v.secret ? React.createElement(Icon, { name: 'eyeOff', size: 11 }) : React.createElement(Icon, { name: 'eye', size: 11 })
+                                        ),
+                                        React.createElement('button', { className: 'kv-del icon-btn', onClick: () => setSettingsForm(f => ({ ...f, _envVars: f._envVars.filter((_, j) => j !== i) })) },
+                                            React.createElement(Icon, { name: 'x', size: 11 }))
+                                    )
+                                ),
+                                React.createElement('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                                    React.createElement('button', {
+                                        className: 'add-row-btn', style: { margin: 0 },
+                                        onClick: () => setSettingsForm(f => ({ ...f, _envVars: [...(f._envVars || []), { id: uid(), key: '', value: '', enabled: true, secret: false }] }))
+                                    },
+                                        React.createElement(Icon, { name: 'plus', size: 11 }), ' Add Variable'
+                                    ),
+                                    React.createElement('div', { style: { flex: 1 } }),
+                                    React.createElement('button', { className: 'btn btn-ghost', style: { padding: '4px 10px', fontSize: 11 }, onClick: () => setEnvEditId(null) }, 'Cancel'),
+                                    React.createElement('button', { className: 'btn btn-primary', style: { padding: '4px 12px', fontSize: 11 }, onClick: saveEnv }, 'Save Environment')
+                                )
+                            )
+                        ),
+
+                        // Interceptor info
+                        React.createElement('div', { style: { marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 } },
+                            React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 12 } }, 'Browser Interceptor'),
+                            React.createElement('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '12px 14px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.7 } },
+                                '1. Open ', React.createElement('code', { style: { background: 'var(--surface3)', padding: '1px 5px', borderRadius: 3, color: 'var(--accent)' } }, 'chrome://extensions/'),
+                                ' and enable Developer Mode', React.createElement('br'),
+                                '2. Click ', React.createElement('strong', null, 'Load unpacked'), ' → select the ',
+                                React.createElement('code', { style: { background: 'var(--surface3)', padding: '1px 5px', borderRadius: 3, color: 'var(--accent)' } }, 'extension/'),
+                                ' folder', React.createElement('br'),
+                                '3. Click the consolio icon in Chrome toolbar', React.createElement('br'),
+                                '4. Toggle ', React.createElement('strong', null, 'Capture requests'), ' ON', React.createElement('br'),
+                                '5. Intercepted requests appear in the ', React.createElement('strong', null, 'Tap'), ' sidebar tab'
+                            )
+                        )
+                    ),
+                    React.createElement('div', { className: 'modal-footer' },
+                        React.createElement('button', { className: 'btn btn-ghost', onClick: () => setShowSettings(false) }, 'Cancel'),
+                        React.createElement('button', { className: 'btn btn-primary', onClick: saveSettings }, 'Save Settings')
+                    )
+                )
+            );
+
+            return React.createElement(React.Fragment, null,
+                React.createElement('div', { className: 'app' }, Sidebar, Main),
+                Modal,
+                SettingsModal,
+                notif && React.createElement('div', { className: cx('notif', notif.type) }, notif.msg)
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+    </script>
+</body>
+
+</html>
