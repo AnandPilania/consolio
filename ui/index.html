@@ -96,7 +96,6 @@
             display: none !important;
         }
 
-        /* Layout */
         .app {
             display: flex;
             height: 100vh;
@@ -120,7 +119,6 @@
             overflow: hidden;
         }
 
-        /* Topbar */
         .topbar {
             height: 44px;
             border-bottom: 1px solid var(--border);
@@ -202,7 +200,6 @@
             color: var(--text);
         }
 
-        /* Sidebar header */
         .sb-header {
             padding: 10px 12px;
             border-bottom: 1px solid var(--border);
@@ -259,7 +256,6 @@
             color: var(--text);
         }
 
-        /* Collections */
         .sb-content {
             flex: 1;
             overflow-y: auto;
@@ -365,7 +361,6 @@
             color: var(--text);
         }
 
-        /* Method colors */
         .m-GET {
             color: var(--green);
         }
@@ -386,7 +381,6 @@
             color: var(--red);
         }
 
-        /* Interceptor sidebar tab */
         .intercept-list {
             padding: 8px;
             display: flex;
@@ -431,7 +425,6 @@
             line-height: 1.6;
         }
 
-        /* Main area */
         .request-bar {
             display: flex;
             align-items: center;
@@ -523,7 +516,6 @@
             color: var(--text);
         }
 
-        /* Tabs */
         .req-tabs {
             display: flex;
             align-items: center;
@@ -568,7 +560,6 @@
             color: var(--accent);
         }
 
-        /* Params/Headers table */
         .params-table {
             flex: 1;
             overflow-y: auto;
@@ -644,7 +635,6 @@
             color: var(--accent);
         }
 
-        /* Body editor */
         .body-type-bar {
             display: flex;
             align-items: center;
@@ -695,7 +685,6 @@
             outline: none;
         }
 
-        /* Auth panel */
         .auth-panel {
             padding: 16px;
             display: flex;
@@ -742,7 +731,6 @@
             border-color: var(--accent);
         }
 
-        /* Split pane */
         .split {
             flex: 1;
             display: flex;
@@ -772,7 +760,6 @@
             flex-direction: column;
         }
 
-        /* Response */
         .res-header {
             display: flex;
             align-items: center;
@@ -896,7 +883,6 @@
             opacity: 0.6;
         }
 
-        /* Modal */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -972,7 +958,6 @@
             color: var(--text);
         }
 
-        /* Notification */
         .notif {
             position: fixed;
             bottom: 20px;
@@ -1006,7 +991,6 @@
             }
         }
 
-        /* Spinner */
         .spinner {
             width: 14px;
             height: 14px;
@@ -1025,7 +1009,6 @@
             }
         }
 
-        /* JSON coloring */
         .json-key {
             color: #7dd3fc;
         }
@@ -1046,7 +1029,6 @@
             color: #d1d5db;
         }
 
-        /* History */
         .hist-item {
             display: flex;
             align-items: center;
@@ -1077,7 +1059,6 @@
             flex-shrink: 0;
         }
 
-        /* Env vars */
         .env-section {
             padding: 12px 16px;
         }
@@ -1101,7 +1082,6 @@
         const { useState, useEffect, useRef, useCallback, useMemo } = React;
         const API = window.location.origin;
 
-        // ─── Utilities ───────────────────────────────────────────────────────────────
         function uid() { return Math.random().toString(36).slice(2, 10); }
         function cx(...args) { return args.filter(Boolean).join(' '); }
         function fmtSize(bytes) {
@@ -1135,7 +1115,6 @@
 
         const METHOD_COLORS = { GET: 'var(--green)', POST: 'var(--blue)', PUT: 'var(--yellow)', PATCH: 'var(--purple)', DELETE: 'var(--red)', HEAD: 'var(--text2)', OPTIONS: 'var(--text2)' };
 
-        // ─── API calls ────────────────────────────────────────────────────────────────
         async function apiFetch(path, opts = {}) {
             const res = await fetch(API + path, {
                 headers: { 'Content-Type': 'application/json' },
@@ -1145,7 +1124,6 @@
             return res.json();
         }
 
-        // ─── Small components ─────────────────────────────────────────────────────────
         function Icon({ name, size = 14, style }) {
             const icons = {
                 plus: 'M12 5v14M5 12h14',
@@ -1177,7 +1155,6 @@
             }, method);
         }
 
-        // ─── KV Table (Params / Headers) ─────────────────────────────────────────────
         function KVTable({ rows, onChange, placeholder = ['Key', 'Value'] }) {
             const update = (i, field, val) => {
                 const next = rows.map((r, j) => j === i ? { ...r, [field]: val } : r);
@@ -1203,7 +1180,6 @@
             );
         }
 
-        // ─── Auth Panel ───────────────────────────────────────────────────────────────
         function AuthPanel({ auth, onChange }) {
             const set = (k, v) => onChange({ ...auth, [k]: v });
             return React.createElement('div', { className: 'auth-panel' },
@@ -1249,7 +1225,6 @@
             );
         }
 
-        // ─── Body Panel ───────────────────────────────────────────────────────────────
         function BodyPanel({ body, onChange }) {
             const set = (k, v) => onChange({ ...body, [k]: v });
             const types = ['none', 'json', 'text', 'form', 'raw'];
@@ -1274,7 +1249,6 @@
             );
         }
 
-        // ─── Response Panel ───────────────────────────────────────────────────────────
         function ResponsePanel({ response, loading }) {
             const [resTab, setResTab] = useState('body');
 
@@ -1349,11 +1323,9 @@
             );
         }
 
-        // Global notif fn
         let _showNotif;
         function showNotif(msg, type = 'success') { _showNotif && _showNotif(msg, type); }
 
-        // ─── Main App ─────────────────────────────────────────────────────────────────
         function App() {
             const [collections, setCollections] = useState([]);
             const [environments, setEnvironments] = useState([]);
@@ -1361,11 +1333,10 @@
             const [history, setHistory] = useState([]);
             const [config, setConfig] = useState({ name: 'Workspace', isProjectMode: false });
 
-            const [sbTab, setSbTab] = useState('collections'); // collections | history | interceptor
+            const [sbTab, setSbTab] = useState('collections');
             const [expandedCols, setExpandedCols] = useState({});
-            const [activeReq, setActiveReq] = useState(null); // {colId, reqId}
+            const [activeReq, setActiveReq] = useState(null);
 
-            // Request state
             const [method, setMethod] = useState('GET');
             const [url, setUrl] = useState('');
             const [reqTab, setReqTab] = useState('params');
@@ -1375,13 +1346,11 @@
             const [auth, setAuth] = useState({ type: 'none' });
             const [reqName, setReqName] = useState('');
 
-            // Response
             const [response, setResponse] = useState(null);
             const [loading, setLoading] = useState(false);
 
-            // UI state
             const [notif, setNotif] = useState(null);
-            const [modal, setModal] = useState(null); // {type: 'newCollection'|'newEnvironment'}
+            const [modal, setModal] = useState(null);
             const [modalForm, setModalForm] = useState({});
             const [intercepted, setIntercepted] = useState([]);
             const [showSettings, setShowSettings] = useState(false);
@@ -1393,7 +1362,6 @@
                 setTimeout(() => setNotif(null), 2500);
             };
 
-            // Load initial data
             useEffect(() => {
                 Promise.all([
                     apiFetch('/api/collections'), apiFetch('/api/environments'),
@@ -1407,7 +1375,6 @@
                     if (cols.length > 0) setExpandedCols({ [cols[0].id]: true });
                 }).catch(() => { });
 
-                // WebSocket for interceptor
                 const ws = new WebSocket(`ws://${window.location.host}/ws?type=ui`);
                 ws.onmessage = (e) => {
                     try {
@@ -1451,7 +1418,6 @@
                         }
                     });
                     setResponse(res);
-                    // Refresh history
                     apiFetch('/api/history?limit=30').then(setHistory).catch(() => { });
                 } catch (e) {
                     setResponse({ error: e.message });
@@ -1461,7 +1427,6 @@
 
             const saveRequest = async () => {
                 if (!activeReq) {
-                    // Save as new — open modal or pick collection
                     if (collections.length === 0) { showNotif('Create a collection first', 'error'); return; }
                     const col = collections[0];
                     const req = await apiFetch(`/api/collections/${col.id}/requests`, {
@@ -1534,9 +1499,7 @@
 
             const enabledCount = (arr) => arr.filter(r => r.enabled && r.key).length;
 
-            // ─── Sidebar ──────────────────────────────────────────────────────────────
             const Sidebar = React.createElement('div', { className: 'sidebar' },
-                // Tab bar
                 React.createElement('div', { className: 'sb-header' },
                     React.createElement('div', { className: 'sb-tabs' },
                         ['collections', 'history', 'interceptor'].map(t =>
@@ -1555,7 +1518,6 @@
                     }, React.createElement(Icon, { name: 'zap', size: 14 }))
                 ),
 
-                // Collections
                 sbTab === 'collections' && React.createElement('div', { className: 'sb-content' },
                     collections.length === 0 && React.createElement('div', { className: 'intercept-empty' },
                         'No collections yet.', React.createElement('br'),
@@ -1604,7 +1566,6 @@
                     )
                 ),
 
-                // History
                 sbTab === 'history' && React.createElement('div', { className: 'sb-content' },
                     history.length === 0
                         ? React.createElement('div', { className: 'intercept-empty' }, 'No history yet')
@@ -1618,7 +1579,6 @@
                         )
                 ),
 
-                // Interceptor
                 sbTab === 'interceptor' && React.createElement('div', { className: 'sb-content' },
                     React.createElement('div', { className: 'intercept-empty', style: { borderBottom: '1px solid var(--border)', paddingBottom: 12 } },
                         React.createElement('strong', { style: { color: 'var(--text2)', display: 'block', marginBottom: 6 } }, 'Browser Interceptor'),
@@ -1642,9 +1602,7 @@
                 )
             );
 
-            // ─── Main ─────────────────────────────────────────────────────────────────
             const Main = React.createElement('div', { className: 'main' },
-                // Topbar
                 React.createElement('div', { className: 'topbar' },
                     React.createElement('div', { className: 'topbar-logo' },
                         React.createElement(Icon, { name: 'zap', size: 18 }), 'consolio'
@@ -1653,7 +1611,6 @@
                         config.isProjectMode ? '📁 ' + config.name : '🌐 Global'
                     ),
                     React.createElement('div', { className: 'topbar-spacer' }),
-                    // Env selector
                     React.createElement('div', { className: 'env-selector' },
                         activeEnv
                             ? [React.createElement('span', { key: 'd', className: 'env-dot', style: { background: activeEnv.color || 'var(--accent)' } }),
@@ -1666,7 +1623,6 @@
                     }, React.createElement(Icon, { name: 'settings', size: 15 }))
                 ),
 
-                // Request bar
                 React.createElement('div', { className: 'request-bar' },
                     React.createElement('select', {
                         className: 'method-select', value: method,
@@ -1694,9 +1650,7 @@
                     )
                 ),
 
-                // Split: req tabs + response
                 React.createElement('div', { className: 'split' },
-                    // Request tabs pane
                     React.createElement('div', { className: 'pane pane-top' },
                         React.createElement('div', { className: 'req-tabs' },
                             [
@@ -1721,7 +1675,6 @@
                         )
                     ),
 
-                    // Response pane
                     React.createElement('div', { className: 'pane pane-bottom' },
                         React.createElement('div', { style: { height: 36, borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', paddingLeft: 16, fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' } }, 'Response'),
                         React.createElement('div', { className: 'pane-inner' },
@@ -1731,7 +1684,6 @@
                 )
             );
 
-            // ─── Modal ────────────────────────────────────────────────────────────────
             const Modal = modal && React.createElement('div', { className: 'modal-overlay', onClick: () => setModal(null) },
                 React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() },
                     React.createElement('div', { className: 'modal-header' },
@@ -1765,7 +1717,6 @@
                 )
             );
 
-            // ── Settings Modal ──────────────────────────────────────────────────────────
             const saveSettings = async () => {
                 await apiFetch('/api/config', { method: 'PUT', body: settingsForm });
                 setConfig(c => ({ ...c, ...settingsForm }));
@@ -1816,7 +1767,6 @@
                         React.createElement('button', { className: 'icon-btn', onClick: () => setShowSettings(false) }, React.createElement(Icon, { name: 'x', size: 14 }))
                     ),
                     React.createElement('div', { style: { flex: 1, overflowY: 'auto', padding: '0 20px 20px' } },
-                        // Project settings
                         React.createElement('div', { style: { marginTop: 20 } },
                             React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 12 } }, 'Project'),
                             React.createElement('div', { className: 'form-group', style: { marginBottom: 10 } },
@@ -1854,7 +1804,6 @@
                             )
                         ),
 
-                        // Environments
                         React.createElement('div', { style: { marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 } },
                             React.createElement('div', { style: { display: 'flex', alignItems: 'center', marginBottom: 12 } },
                                 React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', flex: 1 } }, 'Environments'),
@@ -1872,7 +1821,6 @@
                             ),
                             environments.length === 0 && React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', padding: '8px 0' } }, 'No environments yet'),
 
-                            // Inline env editor
                             envEditId && React.createElement('div', { style: { marginTop: 14, padding: 14, background: 'var(--surface3)', border: '1px solid var(--border2)', borderRadius: 6 } },
                                 React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 } },
                                     envEditId === '__new__' ? 'New Environment' : 'Edit Environment'
@@ -1928,7 +1876,6 @@
                             )
                         ),
 
-                        // Interceptor info
                         React.createElement('div', { style: { marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 } },
                             React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 12 } }, 'Browser Interceptor'),
                             React.createElement('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '12px 14px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.7 } },

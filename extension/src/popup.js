@@ -1,12 +1,11 @@
 const enabledEl = document.getElementById('enabled');
-const portEl = document.getElementById('port');
-const statusEl = document.getElementById('status');
-const openBtn = document.getElementById('openBtn');
+const portEl    = document.getElementById('port');
+const statusEl  = document.getElementById('status');
+const openBtn   = document.getElementById('openBtn');
 
-// Load settings
 chrome.storage.local.get(['enabled', 'port'], (data) => {
     enabledEl.checked = data.enabled ?? false;
-    portEl.value = data.port ?? 4242;
+    portEl.value      = data.port    ?? 4242;
     checkConnection();
 });
 
@@ -15,8 +14,7 @@ enabledEl.addEventListener('change', () => {
 });
 
 portEl.addEventListener('change', () => {
-    const port = parseInt(portEl.value);
-    chrome.storage.local.set({ port });
+    chrome.storage.local.set({ port: parseInt(portEl.value) });
     checkConnection();
 });
 
@@ -31,12 +29,12 @@ async function checkConnection() {
         if (res.ok) {
             const cfg = await res.json();
             statusEl.textContent = `✓ Connected to ${cfg.name || 'consolio'}`;
-            statusEl.className = 'status connected';
+            statusEl.className   = 'status connected';
             return;
         }
-    } catch { }
-    statusEl.textContent = '✕ consolio not running on port ' + port;
-    statusEl.className = 'status disconnected';
+    } catch {}
+    statusEl.textContent = `✕ consolio not running on port ${port}`;
+    statusEl.className   = 'status disconnected';
 }
 
 checkConnection();

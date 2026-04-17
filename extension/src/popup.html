@@ -1,169 +1,33 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="UTF-8">
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            width: 280px;
-            background: #0f0f0f;
-            color: #e8e8e8;
-            font-family: 'Syne', system-ui, sans-serif;
-            font-size: 13px;
-        }
-
-        .header {
-            padding: 14px 16px;
-            border-bottom: 1px solid #222;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .logo {
-            font-weight: 800;
-            font-size: 16px;
-            color: #f97316;
-            letter-spacing: -0.5px;
-        }
-
-        .badge {
-            font-size: 10px;
-            background: #1a1a1a;
-            border: 1px solid #333;
-            padding: 2px 8px;
-            border-radius: 8px;
-            color: #666;
-        }
-
-        .body {
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .toggle-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .toggle-label {
-            font-size: 12px;
-            color: #aaa;
-        }
-
-        .toggle {
-            position: relative;
-            width: 40px;
-            height: 22px;
-        }
-
-        .toggle input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            inset: 0;
-            background: #2a2a2a;
-            border-radius: 11px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .slider:before {
-            content: '';
-            position: absolute;
-            height: 16px;
-            width: 16px;
-            left: 3px;
-            bottom: 3px;
-            background: #666;
-            border-radius: 50%;
-            transition: 0.2s;
-        }
-
-        input:checked+.slider {
-            background: #f97316;
-        }
-
-        input:checked+.slider:before {
-            transform: translateX(18px);
-            background: white;
-        }
-
-        .port-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .port-label {
-            font-size: 11px;
-            color: #666;
-            flex: 1;
-        }
-
-        .port-input {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 4px;
-            padding: 4px 8px;
-            color: #e8e8e8;
-            font-size: 12px;
-            width: 70px;
-            text-align: right;
-        }
-
-        .port-input:focus {
-            outline: none;
-            border-color: #f97316;
-        }
-
-        .open-btn {
-            width: 100%;
-            padding: 9px;
-            background: #f97316;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-weight: 700;
-            font-size: 13px;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .open-btn:hover {
-            background: #fb923c;
-        }
-
-        .status {
-            font-size: 11px;
-            color: #555;
-            text-align: center;
-            padding: 4px 0;
-        }
-
-        .status.connected {
-            color: #22c55e;
-        }
-
-        .status.disconnected {
-            color: #ef4444;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { width: 280px; background: #0a0a0d; color: #e8e8e8; font-family: 'DM Sans', system-ui, sans-serif; font-size: 13px; }
+        .header { padding: 14px 16px; border-bottom: 1px solid #1e1e26; display: flex; align-items: center; gap: 8px; }
+        .logo { font-weight: 800; font-size: 16px; color: #f59e0b; letter-spacing: -0.5px; }
+        .badge { font-size: 10px; background: #161616; border: 1px solid #2e2e2e; padding: 2px 8px; border-radius: 8px; color: #555; }
+        .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+        .toggle-label { font-size: 12px; color: #888; }
+        .toggle { position: relative; width: 40px; height: 22px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; inset: 0; background: #1e1e26; border-radius: 11px; cursor: pointer; transition: 0.2s; }
+        .slider:before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #555; border-radius: 50%; transition: 0.2s; }
+        input:checked + .slider { background: #f59e0b; }
+        input:checked + .slider:before { transform: translateX(18px); background: #07070a; }
+        .port-row { display: flex; align-items: center; gap: 8px; }
+        .port-label { font-size: 11px; color: #555; flex: 1; }
+        .port-input { background: #161616; border: 1px solid #2e2e2e; border-radius: 4px; padding: 4px 8px; color: #e8e8e8; font-size: 12px; width: 70px; text-align: right; outline: none; }
+        .port-input:focus { border-color: #f59e0b; }
+        .open-btn { width: 100%; padding: 9px; background: #f59e0b; color: #07070a; border: none; border-radius: 5px; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+        .open-btn:hover { background: #fbbf24; }
+        .status { font-size: 11px; color: #555; text-align: center; padding: 4px 0; }
+        .status.connected    { color: #34d399; }
+        .status.disconnected { color: #f87171; }
     </style>
 </head>
-
 <body>
     <div class="header">
         <span class="logo">⚡ consolio</span>
@@ -181,10 +45,9 @@
             <span class="port-label">consolio port</span>
             <input type="number" class="port-input" id="port" value="4242" min="1024" max="65535">
         </div>
-        <div id="status" class="status">Checking connection...</div>
+        <div id="status" class="status">Checking connection…</div>
         <button class="open-btn" id="openBtn">Open consolio →</button>
     </div>
     <script src="popup.js"></script>
 </body>
-
 </html>

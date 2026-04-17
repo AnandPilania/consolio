@@ -17,15 +17,13 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
     const storage = new consolioStorage(projectPath);
     const fastify = Fastify({ logger: false });
 
-    // CORS — allow ALL origins including chrome-extension://
     await fastify.register(cors, {
         origin: (origin, cb) => cb(null, true),
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-        credentials: true
+        credentials: true,
     });
 
-    // WebSocket for interceptor relay
     const wss = new WebSocketServer({ noServer: true });
     wss.on('connection', (ws, req) => {
         const type = new URL(req.url, 'http://localhost').searchParams.get('type');
@@ -41,14 +39,12 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
         });
     });
 
-    // !! API routes BEFORE static — prevents @fastify/static from shadowing /api/* with text/html
     await fastify.register(proxyRoutes, { storage });
     await fastify.register(collectionRoutes, { storage });
     await fastify.register(environmentRoutes, { storage });
     await fastify.register(historyRoutes, { storage });
     await fastify.register(configRoutes, { storage });
 
-    // Interceptor HTTP capture endpoint (Chrome extension posts here)
     fastify.post('/api/interceptor/capture', async (req) => {
         const entry = req.body;
         wss.clients.forEach(client => {
@@ -59,14 +55,12 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
         return { received: true };
     });
 
-    // Static UI — AFTER API routes
     await fastify.register(staticFiles, {
         root: join(__dirname, '../ui'),
         prefix: '/',
         wildcard: false
     });
 
-    // SPA fallback
     fastify.setNotFoundHandler((req, reply) => {
         if (req.url.startsWith('/api/')) {
             return reply.status(404).send({ error: 'API route not found' });
@@ -76,7 +70,6 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
 
     await fastify.listen({ port, host: '127.0.0.1' });
 
-    // Attach WebSocket upgrade handler AFTER listen
     fastify.server.on('upgrade', (req, socket, head) => {
         if (req.url?.startsWith('/ws')) {
             wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));

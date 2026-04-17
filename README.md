@@ -1,29 +1,17 @@
-# ⚡ consolio — Lightweight API Testing Tool
+# ⚡ consolio
 
-> A fast, project-isolated Postman alternative. Runs as an `npx` package — no installation bloat, no licensing, ~30MB RAM.
-
-## Why consolio?
-
-|                     | Postman    | Apidog     | **consolio**             |
-| ------------------- | ---------- | ---------- | ------------------------ |
-| RAM Usage           | ~300MB     | ~400MB     | **~30MB**                |
-| Disk (installed)    | 400MB      | 1GB+       | **<15MB**                |
-| Project isolation   | Workspaces | Workspaces | **`.consolio/` in repo** |
-| Offline             | ✓          | ✓          | **✓**                    |
-| License required    | Yes        | Freemium   | **MIT / Free**           |
-| Browser interceptor | Extension  | Extension  | **✓ Extension included** |
-| `npx` support       | ✗          | ✗          | **✓**                    |
+> A fast, project-isolated API testing tool. Runs as an `npx` package — no installation bloat, ~30MB RAM.
 
 ---
 
-## Quick Start
+## Quick start
 
 ```bash
-# Run immediately — no install
-npx consolio
+# Run immediately — no install needed
+npx @pilaniaanand/consolio
 
 # Or install globally
-npm install -g consolio
+npm install -g @pilaniaanand/consolio
 consolio
 ```
 
@@ -31,123 +19,80 @@ Opens at `http://localhost:4242` automatically.
 
 ---
 
-## Project Isolation
+## Project isolation
 
-Initialize consolio in any project to store collections **alongside your code**:
+Store your API collections right alongside your code:
 
 ```bash
-cd my-api-project
-npx consolio init --name "My API Project"
+cd my-project
+npx consolio init --name "My API"
+npx consolio          # auto-detects .consolio/ in current dir
 ```
 
-This creates:
-```
-my-api-project/
-└── .consolio/
-    ├── config.json              # Project settings
-    ├── collections/
-    │   └── example.json         # Your API collections
-    ├── environments/
-    │   └── development.json     # Environment variables
-    └── history/                 # Request history (gitignored)
-```
-
-**Commit `.consolio/collections/` and `.consolio/environments/`** to share API collections with your team. History is auto-gitignored.
-
-Then run:
-```bash
-npx consolio        # Auto-detects .consolio/ in current dir
-```
+**Commit** `.consolio/collections/` and `.consolio/environments/` to share with your team.  
+History is auto-gitignored.
 
 ---
 
 ## Features
 
-### ✅ Request Builder
-- All HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
-- Query params, headers with enable/disable toggles
-- Body: JSON, form-encoded, plain text, raw
-- Auth: Bearer token, Basic auth, API key (header/query)
-
-### ✅ Environment Variables
-- Multiple environments (Development, Staging, Production)
-- Use `{{VAR_NAME}}` syntax in URLs, headers, body
-- Variables stored per-project in `.consolio/environments/`
-
-### ✅ Collections
-- Organize requests into collections
-- Collections stored as readable JSON — version control friendly
-- Expandable tree view in sidebar
-
-### ✅ Request History
-- Last 200 requests auto-saved
-- Click any history entry to reload the request + response
-- Stored in `.consolio/history/` (gitignored)
-
-### ✅ Response Viewer
-- Syntax-highlighted JSON
-- Response headers table
-- Status code, timing (ms), size
-- Copy response body
-
-### ✅ Browser Interceptor
-Install the Chrome extension to capture API calls made by any website:
-
-1. Go to `chrome://extensions/` → Enable **Developer mode**
-2. Click **Load unpacked** → select the `extension/` folder in this repo
-3. Click the consolio icon → toggle **Capture requests** on
-4. Browse any website — requests appear in consolio's **Tap** sidebar
-5. Click any intercepted request to load it into the builder
+| | consolio | Postman | Apidog |
+|---|---|---|---|
+| RAM | **~30MB** | ~300MB | ~400MB |
+| npx support | ✅ | ✗ | ✗ |
+| Project isolation | ✅ `.consolio/` | Workspaces | Workspaces |
+| Offline | ✅ | ✅ | ✅ |
+| Multi-tab requests | ✅ | ✅ | ✅ |
+| Pre/post scripts | ✅ | ✅ | ✅ |
+| Test assertions | ✅ | ✅ | ✅ |
+| Copy as cURL | ✅ | ✅ | ✅ |
+| Import cURL/Postman | ✅ | ✅ | ✅ |
+| Collection runner | ✅ | ✅ | ✅ |
+| Browser interceptor | ✅ extension | extension | extension |
+| Drag-to-resize UI | ✅ | ✅ | ✅ |
+| Customisable layout | ✅ | - | - |
+| License | **MIT/Free** | Freemium | Freemium |
 
 ---
 
-## CLI Reference
+## Project structure
 
-```bash
-consolio                        # Start server (default port 4242)
-consolio start --port 8080      # Custom port
-consolio start --no-open        # Don't auto-open browser
-consolio init                   # Initialize project
-consolio init --name "My App"   # Initialize with project name
-consolio --help                 # Show help
-consolio --version              # Show version
 ```
-
----
-
-## Tech Stack
-
-- **Runtime**: Node.js 18+ (ESM)
-- **Server**: [Fastify](https://fastify.dev/) — fastest Node.js HTTP framework
-- **UI**: Single-file React 18 (CDN) + custom CSS — no build step
-- **Storage**: JSON files (zero dependencies, human-readable)
-- **WebSocket**: `ws` — for real-time interceptor relay
-
----
-
-## Data Format
-
-Collections are plain JSON — easy to read, diff, and merge:
-
-```json
-{
-  "id": "col_abc123",
-  "name": "User API",
-  "requests": [
-    {
-      "id": "req_def456",
-      "name": "Get Users",
-      "method": "GET",
-      "url": "{{BASE_URL}}/users",
-      "headers": [
-        { "key": "Authorization", "value": "Bearer {{TOKEN}}", "enabled": true }
-      ],
-      "params": [],
-      "body": { "type": "none" },
-      "auth": { "type": "none" }
-    }
-  ]
-}
+consolio/
+├── bin/
+│   └── consolio.js          # CLI entry point (commander)
+├── server/
+│   ├── index.js             # Fastify server + WebSocket
+│   ├── init.js              # `consolio init` command
+│   ├── storage.js           # JSON file storage
+│   └── routes/
+│       ├── collections.js   # CRUD for collections + requests
+│       ├── environments.js  # CRUD for environments + history + config
+│       └── proxy.js         # /api/execute — proxies HTTP requests
+├── extension/
+│   ├── manifest.json        # Chrome MV3 extension manifest
+│   └── src/
+│       ├── background.js    # Service worker — captures webRequests
+│       ├── popup.html       # Extension popup UI
+│       └── popup.js         # Popup logic
+├── ui-src/                  # Vite + React source (edit this)
+│   ├── index.html
+│   ├── vite.config.js       # Builds to ../ui/
+│   ├── package.json
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx          # Root layout — resizable PanelGroup
+│       ├── store/index.js   # Zustand store (all state + persistence)
+│       ├── utils/index.js   # Helpers: uid, buildCurl, parseCurl, runTests, runScript
+│       ├── styles/          # CSS tokens + global reset
+│       └── components/
+│           ├── layout/      # Topbar
+│           ├── sidebar/     # Collections, History, Interceptor + filter rules
+│           ├── request/     # Multi-tab, URL bar, Params/Headers/Body/Auth/Scripts/Tests
+│           ├── response/    # Status, Body (search+highlight), Headers, Test results
+│           ├── modals/      # CustomiseLayout, NewCollection, Import, Runner, Settings
+│           └── shared/      # Icon, Btn, KVTable, Notification, ...
+└── ui/                      # Built UI — served by Fastify (do not edit directly)
 ```
 
 ---
@@ -155,13 +100,89 @@ Collections are plain JSON — easy to read, diff, and merge:
 ## Development
 
 ```bash
-git clone ...
-cd consolio
+# Install server deps
 npm install
-node bin/consolio.js         # Run directly
+
+# Start server
+npm run dev                  # → http://localhost:4242
+
+# UI hot-reload (separate terminal)
+npm run ui:dev               # → http://localhost:5173 (proxies API to :4242)
+
+# Build UI for production
+npm run ui:build             # compiles ui-src/ → ui/
+```
+
+---
+
+## Browser interceptor
+
+1. Open `chrome://extensions/` → enable **Developer Mode**
+2. Click **Load unpacked** → select the `extension/` folder
+3. Click the consolio icon in your Chrome toolbar
+4. Toggle **Capture requests** ON
+5. Intercepted requests appear in the **Tap** sidebar tab
+
+### Interceptor filter rules
+
+The Tap sidebar supports **blacklist** and **whitelist** modes:
+
+- **Blacklist** (default) — block requests that match any rule. Useful for filtering out analytics, CDN, or other noise.
+- **Whitelist** — capture *only* requests matching at least one rule. Useful for isolating a specific API domain.
+
+Each rule configures:
+- **Target**: URL · Host · Method · Content-Type
+- **Mode**: contains · starts with · ends with · exact · regex
+- **Pattern**: the string or regex to match
+
+Rules persist across sessions.
+
+---
+
+## Pre/post request scripts
+
+```js
+// Pre-request tab — runs before the request is sent
+consolio.setVariable('timestamp', Date.now())
+consolio.setVariable('sig', btoa(consolio.getVariable('secret') + Date.now()))
+
+// Post-response tab — runs after the response arrives
+const data = JSON.parse(response.body)
+consolio.setVariable('authToken', data.token)
+consolio.log('Got token:', data.token)
+```
+
+Available API: `consolio.log(...args)`, `consolio.setVariable(key, value)`, `consolio.getVariable(key)`  
+Context: `request` (method, url), `response` (status, body, headers, elapsed), `environment` (current vars)
+
+---
+
+## Customise layout
+
+Click the **⊞** icon in the topbar to open the Layout panel:
+- **Drag** panels to reorder (sidebar, request pane, response pane)
+- **Toggle** panel visibility
+- **Resize** with sliders or by dragging the dividers in the UI
+- **Presets**: Default · Focus Request · Focus Response · No Sidebar
+
+All preferences persist in localStorage.
+
+---
+
+## CLI reference
+
+```bash
+consolio                        # Start server (default port 4242)
+consolio start --port 8080      # Custom port
+consolio start --no-open        # Don't auto-open browser
+consolio init                   # Initialize project
+consolio init --name "My App"   # Initialize with project name
+consolio --help
+consolio --version
 ```
 
 ---
 
 ## License
+
 MIT

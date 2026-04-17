@@ -22,8 +22,7 @@
     "type": "module",
     "main": "./server/index.js",
     "scripts": {
-        "start": "node bin/consolio.js",
-        "dev": "node bin/consolio.js --dev"
+        "start": "node bin/consolio.js"
     },
     "dependencies": {
         "@fastify/cors": "^9.0.1",
