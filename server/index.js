@@ -4,14 +4,17 @@ import staticFiles from '@fastify/static';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
 import chalk from 'chalk';
 
 import { consolioStorage } from './storage.js';
 import { proxyRoutes } from './routes/proxy.js';
 import { collectionRoutes } from './routes/collections.js';
 import { environmentRoutes, historyRoutes, configRoutes } from './routes/environments.js';
+import { versionRoutes } from './routes/version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
 
 export async function startServer({ port = 4242, autoOpen = true, projectPath = process.cwd() } = {}) {
     const storage = new consolioStorage(projectPath);
@@ -21,7 +24,7 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
         origin: (origin, cb) => cb(null, true),
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-        credentials: true,
+        credentials: true
     });
 
     const wss = new WebSocketServer({ noServer: true });
@@ -44,6 +47,7 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
     await fastify.register(environmentRoutes, { storage });
     await fastify.register(historyRoutes, { storage });
     await fastify.register(configRoutes, { storage });
+    await fastify.register(versionRoutes);
 
     fastify.post('/api/interceptor/capture', async (req) => {
         const entry = req.body;
@@ -80,7 +84,7 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
 
     const url = `http://localhost:${port}`;
     const mode = storage.isProjectMode ? chalk.cyan('Project Mode') : chalk.yellow('Global Mode');
-    console.log(`${chalk.green('✔')} consolio running at ${chalk.underline.cyan(url)}`);
+    console.log(`${chalk.green('✔')} consolio v${pkg.version} running at ${chalk.underline.cyan(url)}`);
     console.log(`${chalk.green('✔')} Workspace: ${chalk.dim(storage.consolioDir)} ${mode}`);
     console.log('');
     console.log(chalk.dim('  Press Ctrl+C to stop'));
@@ -94,6 +98,26 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
             console.log(chalk.dim(`  Open ${url} in your browser`));
         }
     }
+
+    (async () => {
+        try {
+            const res = await fetch(`https://registry.npmjs.org/${pkg.name}/latest`, {
+                signal: AbortSignal.timeout(6000),
+                headers: { 'User-Agent': `consolio/${pkg.version}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.version && data.version !== pkg.version) {
+                    console.log(
+                        chalk.bgYellow.black(' UPDATE ') +
+                        chalk.yellow(` v${pkg.version} → v${chalk.bold(data.version)} available`)
+                    );
+                    console.log(chalk.dim(`  npm install -g ${pkg.name}@latest`));
+                    console.log('');
+                }
+            }
+        } catch { /* offline or npm registry unavailable — silently skip */ }
+    })();
 
     process.on('SIGINT', async () => {
         console.log(chalk.dim('\n  Shutting down consolio...'));

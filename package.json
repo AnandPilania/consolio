@@ -1,6 +1,6 @@
 {
     "name": "@pilaniaanand/consolio",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Lightweight, project-isolated API testing tool — a fast Postman alternative",
     "keywords": [
         "api",

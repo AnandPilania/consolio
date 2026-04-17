@@ -119,13 +119,51 @@
             overflow: hidden;
         }
 
+        .update-banner {
+            background: rgba(249, 115, 22, .08);
+            border-bottom: 1px solid rgba(249, 115, 22, .2);
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text2);
+            flex-shrink: 0;
+        }
+
+        .update-banner strong {
+            color: var(--accent);
+        }
+
+        .update-banner code {
+            background: var(--surface2);
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text);
+        }
+
+        .update-dismiss {
+            margin-left: auto;
+            color: var(--text3);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+            transition: color .15s;
+        }
+
+        .update-dismiss:hover {
+            color: var(--text);
+        }
+
         .topbar {
             height: 44px;
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             padding: 0 16px;
-            gap: 12px;
+            gap: 10px;
             flex-shrink: 0;
             background: var(--surface);
         }
@@ -476,6 +514,25 @@
             color: var(--text3);
         }
 
+        .curl-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 10px;
+            font-size: 11px;
+            color: var(--text3);
+            transition: all .15s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .curl-btn:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
         .send-btn {
             background: var(--accent);
             color: white;
@@ -729,6 +786,67 @@
         .form-input:focus {
             outline: none;
             border-color: var(--accent);
+        }
+
+        .code-lang-bar {
+            display: flex;
+            gap: 2px;
+            padding: 8px 10px 0;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+
+        .code-lang-btn {
+            padding: 5px 12px;
+            border-radius: 4px 4px 0 0;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text3);
+            font-weight: 500;
+            transition: all .1s;
+            white-space: nowrap;
+        }
+
+        .code-lang-btn.active {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-bottom: 1px solid var(--bg);
+        }
+
+        .code-lang-btn:hover:not(.active) {
+            color: var(--text2);
+            background: var(--surface2);
+        }
+
+        .code-output {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: var(--surface2);
+        }
+
+        .code-copy-btn {
+            position: sticky;
+            top: 8px;
+            float: right;
+            margin: 8px;
+            background: var(--surface3);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text2);
+            cursor: pointer;
+            transition: all .15s;
+            z-index: 1;
+        }
+
+        .code-copy-btn:hover {
+            border-color: var(--border2);
+            color: var(--text);
         }
 
         .split {
@@ -1249,6 +1367,73 @@
             );
         }
 
+        function generateCode(lang, tab, envVars = {}) {
+            const rv = s => (s || '').replace(/\{\{(\w+)\}\}/g, (_, k) => envVars[k] || `{{${k}}}`);
+            const { method, url, params, headers, body, auth } = tab;
+            let fu = rv(url) || 'https://example.com';
+            const ep = (params || []).filter(p => p.enabled && p.key);
+            if (ep.length) { try { const u = new URL(fu.startsWith('http') ? fu : 'https://' + fu); ep.forEach(p => u.searchParams.set(p.key, rv(p.value || ''))); fu = u.toString(); } catch { } }
+            const hdrs = {};
+            (headers || []).filter(h => h.enabled && h.key).forEach(h => { hdrs[h.key] = rv(h.value); });
+            if (auth?.type === 'bearer' && auth.token) hdrs['Authorization'] = `Bearer ${rv(auth.token)}`;
+            else if (auth?.type === 'basic') hdrs['Authorization'] = `Basic ${btoa(`${rv(auth.username || '')}:${rv(auth.password || '')}`)}`;
+            else if (auth?.type === 'apikey' && auth.placement === 'header' && auth.key) hdrs[auth.key] = rv(auth.value || '');
+            const hasBody = body?.type !== 'none' && body?.content && !['GET', 'HEAD'].includes(method);
+            if (hasBody && body.type === 'json' && !hdrs['Content-Type']) hdrs['Content-Type'] = 'application/json';
+            const he = Object.entries(hdrs);
+            switch (lang) {
+                case 'curl': {
+                    let l = [`curl -X ${method} '${fu}'`];
+                    he.forEach(([k, v]) => l.push(`  -H '${k}: ${v}'`));
+                    if (hasBody) l.push(`  -d '${body.content.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' `);
+                    return l.join(' \\\n');
+                }
+                case 'fetch': {
+                    const o = { method }; if (he.length) o.headers = hdrs; if (hasBody) o.body = body.content;
+                    return `const response = await fetch('${fu}', ${JSON.stringify(o, null, 2)});\n\nconst data = await response.json();\nconsole.log(data);`;
+                }
+                case 'axios': {
+                    const c = {}; if (he.length) c.headers = hdrs; if (hasBody) { try { c.data = JSON.parse(body.content); } catch { c.data = body.content; } }
+                    const cs = Object.keys(c).length ? ',\n' + JSON.stringify(c, null, 2) : '';
+                    return `import axios from 'axios';\n\nconst { data } = await axios.${method.toLowerCase()}(\n  '${fu}'${cs}\n);\nconsole.log(data);`;
+                }
+                case 'python': {
+                    let code = 'import requests\n\n';
+                    if (he.length) code += `headers = ${JSON.stringify(hdrs, null, 4)}\n\n`;
+                    const args = [`'${fu}'`];
+                    if (he.length) args.push('headers=headers');
+                    if (hasBody) { try { const p = JSON.parse(body.content); args.push(`json=${JSON.stringify(p, null, 4)}`); } catch { args.push(`data="""${body.content}"""`); } }
+                    code += `response = requests.${method.toLowerCase()}(\n    ${args.join(',\n    ')}\n)\nprint(response.status_code)\nprint(response.json())`;
+                    return code;
+                }
+                case 'php': {
+                    const ph = he.map(([k, v]) => `'${k}: ${v}'`).join(', ');
+                    let code = `<?php\n$curl = curl_init();\ncurl_setopt_array($curl, [\n    CURLOPT_URL => '${fu}',\n    CURLOPT_RETURNTRANSFER => true,\n    CURLOPT_CUSTOMREQUEST => '${method}'`;
+                    if (ph) code += `,\n    CURLOPT_HTTPHEADER => [${ph}]`;
+                    if (hasBody) code += `,\n    CURLOPT_POSTFIELDS => '${body.content.replace(/'/g, "\\'")}' `;
+                    code += '\n]);\n$response = curl_exec($curl);\n$err = curl_error($curl);\ncurl_close($curl);\nif ($err) echo "Error: ".$err; else echo $response;';
+                    return code;
+                }
+                default: return '';
+            }
+        }
+
+        function CodeGenPanel({ tab, envVars }) {
+            const [lang, setLang] = useState('curl');
+            const code = useMemo(() => generateCode(lang, tab, envVars), [lang, tab, envVars]);
+            const copy = () => { navigator.clipboard.writeText(code); showNotif('Code copied', 'success'); };
+            const langs = [['curl', 'cURL'], ['fetch', 'Fetch'], ['axios', 'Axios'], ['python', 'Python'], ['php', 'PHP']];
+            return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' } },
+                React.createElement('div', { className: 'code-lang-bar' },
+                    langs.map(([v, l]) => React.createElement('button', { key: v, className: cx('code-lang-btn', lang === v && 'active'), onClick: () => setLang(v) }, l))
+                ),
+                React.createElement('div', { className: 'code-output' },
+                    React.createElement('button', { className: 'code-copy-btn', onClick: copy }, 'Copy'),
+                    React.createElement('pre', { style: { padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text)' } }, code)
+                )
+            );
+        }
+
         function ResponsePanel({ response, loading }) {
             const [resTab, setResTab] = useState('body');
 
@@ -1332,6 +1517,8 @@
             const [activeEnv, setActiveEnv] = useState(null);
             const [history, setHistory] = useState([]);
             const [config, setConfig] = useState({ name: 'Workspace', isProjectMode: false });
+            const [versionInfo, setVersionInfo] = useState(null);
+            const [updateDismissed, setUpdateDismissed] = useState(false);
 
             const [sbTab, setSbTab] = useState('collections');
             const [expandedCols, setExpandedCols] = useState({});
@@ -1365,12 +1552,14 @@
             useEffect(() => {
                 Promise.all([
                     apiFetch('/api/collections'), apiFetch('/api/environments'),
-                    apiFetch('/api/history?limit=30'), apiFetch('/api/config')
-                ]).then(([cols, envs, hist, cfg]) => {
+                    apiFetch('/api/history?limit=30'), apiFetch('/api/config'),
+                    apiFetch('/api/version')
+                ]).then(([cols, envs, hist, cfg, ver]) => {
                     setCollections(cols);
                     setEnvironments(envs);
                     setHistory(hist);
                     setConfig(cfg);
+                    setVersionInfo(ver);
                     if (envs.length > 0) setActiveEnv(envs[0]);
                     if (cols.length > 0) setExpandedCols({ [cols[0].id]: true });
                 }).catch(() => { });
@@ -1603,6 +1792,11 @@
             );
 
             const Main = React.createElement('div', { className: 'main' },
+                versionInfo?.updateAvailable && !updateDismissed && React.createElement('div', { className: 'update-banner' },
+                    React.createElement('span', null, '⚡ Update available: ', React.createElement('strong', null, `v${versionInfo.latest}`)),
+                    React.createElement('code', null, versionInfo.installCmd),
+                    React.createElement('span', { className: 'update-dismiss', onClick: () => setUpdateDismissed(true), 'aria-label': 'Dismiss' }, '×')
+                ),
                 React.createElement('div', { className: 'topbar' },
                     React.createElement('div', { className: 'topbar-logo' },
                         React.createElement(Icon, { name: 'zap', size: 18 }), 'consolio'
@@ -1657,7 +1851,8 @@
                                 ['params', `Params${enabledCount(params) ? ` (${enabledCount(params)})` : ''}`, null],
                                 ['headers', `Headers${enabledCount(headers) ? ` (${enabledCount(headers)})` : ''}`, null],
                                 ['body', 'Body', null],
-                                ['auth', 'Auth', null]
+                                ['auth', 'Auth', null],
+                                ['code', 'Code', null]
                             ].map(([t, label]) =>
                                 React.createElement('button', { key: t, className: cx('tab', reqTab === t && 'active'), onClick: () => setReqTab(t) }, label)
                             ),
@@ -1671,7 +1866,8 @@
                             reqTab === 'params' && React.createElement(KVTable, { rows: params, onChange: setParams, placeholder: ['Parameter', 'Value'] }),
                             reqTab === 'headers' && React.createElement(KVTable, { rows: headers, onChange: setHeaders, placeholder: ['Header', 'Value'] }),
                             reqTab === 'body' && React.createElement(BodyPanel, { body, onChange: setBody }),
-                            reqTab === 'auth' && React.createElement(AuthPanel, { auth, onChange: setAuth })
+                            reqTab === 'auth' && React.createElement(AuthPanel, { auth, onChange: setAuth }),
+                            reqTab === 'code' && React.createElement(CodeGenPanel, { tab: { method, url, params, headers, body, auth }, envVars })
                         )
                     ),
 
