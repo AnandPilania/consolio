@@ -1,0 +1,112 @@
+/* ── Method badge ─────────────────────────────────────────────────────────── */
+.badge {
+  font-size: 9px; font-weight: 700;
+  font-family: var(--font-mono);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; padding: 2px 0;
+  border-radius: var(--r-sm);
+  letter-spacing: .3px;
+  flex-shrink: 0;
+}
+.badgeSm { width: 28px; font-size: 8px; }
+
+.m_GET    { color: var(--m-GET);     background: color-mix(in srgb, var(--m-GET)     12%, transparent); }
+.m_POST   { color: var(--m-POST);    background: color-mix(in srgb, var(--m-POST)    12%, transparent); }
+.m_PUT    { color: var(--m-PUT);     background: color-mix(in srgb, var(--m-PUT)     12%, transparent); }
+.m_PATCH  { color: var(--m-PATCH);   background: color-mix(in srgb, var(--m-PATCH)   12%, transparent); }
+.m_DELETE { color: var(--m-DELETE);  background: color-mix(in srgb, var(--m-DELETE)  12%, transparent); }
+.m_HEAD   { color: var(--m-HEAD);    background: color-mix(in srgb, var(--m-HEAD)    12%, transparent); }
+.m_OPTIONS{ color: var(--m-OPTIONS); background: color-mix(in srgb, var(--m-OPTIONS) 12%, transparent); }
+
+/* ── Icon button ──────────────────────────────────────────────────────────── */
+.iconBtn {
+  width: 24px; height: 24px;
+  border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--tx-faint);
+  transition: background .12s, color .12s;
+  flex-shrink: 0;
+}
+.iconBtn:hover { background: var(--bg-overlay); color: var(--tx-base); }
+.iconBtnDanger:hover { color: var(--err); }
+
+/* ── Button ───────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: var(--r-md);
+  font-size: 12px; font-weight: 600; font-family: var(--font-ui);
+  transition: all .15s; white-space: nowrap;
+}
+.btn_primary { background: var(--accent); color: var(--tx-inverse); }
+.btn_primary:hover { background: var(--accent-hover); }
+.btn_primary:active { background: var(--accent-press); transform: scale(.97); }
+.btn_primary:disabled { opacity: .5; pointer-events: none; }
+.btn_ghost {
+  background: var(--bg-raised); color: var(--tx-muted);
+  border: 1px solid var(--bd-subtle);
+}
+.btn_ghost:hover { border-color: var(--bd-base); color: var(--tx-base); }
+.btn_danger { background: var(--err-dim); color: var(--err); border: 1px solid color-mix(in srgb, var(--err) 20%, transparent); }
+.btn_danger:hover { background: color-mix(in srgb, var(--err) 20%, transparent); }
+.btn_sm { padding: 4px 10px; font-size: 11px; }
+
+/* ── Spinner ──────────────────────────────────────────────────────────────── */
+.spinner {
+  border: 2px solid rgba(255,255,255,.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: inline-block; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* ── KV Table ─────────────────────────────────────────────────────────────── */
+.kvWrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.kvTable { flex: 1; overflow-y: auto; }
+.kvRow {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-bottom: 1px solid var(--bd-faint);
+}
+.kvRow:hover { background: var(--bg-raised); }
+.kvCheck { width: 13px; height: 13px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.kvInput {
+  flex: 1; background: transparent; border: 1px solid transparent;
+  border-radius: var(--r-sm); padding: 4px 6px;
+  color: var(--tx-base); font-family: var(--font-mono); font-size: 11.5px;
+  transition: border-color .1s;
+}
+.kvInput:focus { border-color: var(--bd-base); background: var(--bg-overlay); }
+.kvInput::placeholder { color: var(--tx-faint); }
+.addRowBtn {
+  margin: 6px 12px; padding: 5px 10px;
+  font-size: 11px; color: var(--tx-faint);
+  border: 1px dashed var(--bd-subtle); border-radius: var(--r-sm);
+  display: flex; align-items: center; gap: 4px;
+  transition: all .15s;
+}
+.addRowBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
+.formGroup { display: flex; flex-direction: column; gap: 5px; }
+.formLabel { font-size: 10.5px; font-weight: 600; color: var(--tx-faint); text-transform: uppercase; letter-spacing: .5px; }
+.formInput, .formSelect {
+  background: var(--bg-raised); border: 1px solid var(--bd-subtle);
+  border-radius: var(--r-md); padding: 7px 10px;
+  color: var(--tx-base); font-family: var(--font-mono); font-size: 12px;
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%;
+}
+.formInput:focus, .formSelect:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.formInput::placeholder { color: var(--tx-faint); }
+.formSelect { appearance: none; cursor: pointer; }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; color: var(--tx-faint); padding: 24px;
+  text-align: center;
+}
+.emptyIcon { font-size: 28px; opacity: .3; }
+.emptyText { font-size: 13px; color: var(--tx-muted); }
+.emptySub  { font-size: 11px; color: var(--tx-faint); }

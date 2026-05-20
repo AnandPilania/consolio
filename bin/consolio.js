@@ -23,23 +23,25 @@ program
 
 program
     .command('start', { isDefault: true })
-    .description('Start the consolio server and open the UI')
+    .description('Start the consolio server')
     .option('-p, --port <port>', 'Port to run on', '4242')
     .option('--no-open', 'Do not auto-open browser')
+    .option('--dev', 'API-only mode — use alongside `npm run dev:ui` for hot-reload')
     .option('--project <path>', 'Path to project directory', process.cwd())
     .action(async (options) => {
+        if (options.dev) process.env.CONSOLIO_DEV = 'true';
         console.log(BANNER);
         await startServer({
-            port: parseInt(options.port),
-            autoOpen: options.open,
-            projectPath: options.project
+            port:        parseInt(options.port),
+            autoOpen:    options.open,
+            projectPath: options.project,
         });
     });
 
 program
     .command('init')
-    .description('Initialize consolio in the current project (creates .consolio/ directory)')
-    .option('--name <name>', 'Project name', 'My Project')
+    .description('Initialize consolio in the current project')
+    .option('--name <n>', 'Project name', 'My Project')
     .action(async (options) => {
         console.log(BANNER);
         await initProject({ name: options.name });

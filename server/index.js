@@ -11,20 +11,23 @@ import { consolioStorage } from './storage.js';
 import { proxyRoutes } from './routes/proxy.js';
 import { collectionRoutes } from './routes/collections.js';
 import { environmentRoutes, historyRoutes, configRoutes } from './routes/environments.js';
-import { versionRoutes } from './routes/version.js';
+import { versionRoutes, getLatestVersion } from './routes/version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
 
 export async function startServer({ port = 4242, autoOpen = true, projectPath = process.cwd() } = {}) {
     const storage = new consolioStorage(projectPath);
+
+    const isDev = process.env.CONSOLIO_DEV === 'true';
+
     const fastify = Fastify({ logger: false });
 
     await fastify.register(cors, {
         origin: (origin, cb) => cb(null, true),
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-        credentials: true
+        credentials: true,
     });
 
     const wss = new WebSocketServer({ noServer: true });
@@ -42,6 +45,32 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
         });
     });
 
+    async function gracefulShutdown(signal) {
+        console.log(chalk.dim(`\n  Received ${signal}, shutting down gracefully...`));
+
+        wss.close(() => {
+            console.log(chalk.dim('  WebSocket server closed'));
+        });
+
+        const timeout = setTimeout(() => {
+            console.error(chalk.red('  Forced shutdown due to timeout'));
+            process.exit(1);
+        }, 10000);
+
+        try {
+            await fastify.close();
+            console.log(chalk.dim('  Fastify server closed'));
+            clearTimeout(timeout);
+            process.exit(0);
+        } catch (err) {
+            console.error(chalk.red('  Error during shutdown:'), err);
+            process.exit(1);
+        }
+    }
+
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
     await fastify.register(proxyRoutes, { storage });
     await fastify.register(collectionRoutes, { storage });
     await fastify.register(environmentRoutes, { storage });
@@ -52,78 +81,58 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
     fastify.post('/api/interceptor/capture', async (req) => {
         const entry = req.body;
         wss.clients.forEach(client => {
-            if (client.readyState === 1) {
-                client.send(JSON.stringify({ type: 'intercepted', data: entry }));
-            }
+            if (client.readyState === 1) client.send(JSON.stringify({ type: 'intercepted', data: entry }));
         });
         return { received: true };
     });
 
-    await fastify.register(staticFiles, {
-        root: join(__dirname, '../ui'),
-        prefix: '/',
-        wildcard: false
-    });
-
-    fastify.setNotFoundHandler((req, reply) => {
-        if (req.url.startsWith('/api/')) {
-            return reply.status(404).send({ error: 'API route not found' });
-        }
-        reply.sendFile('index.html');
-    });
+    if (isDev) {
+        fastify.get('/', async (req, reply) => reply.redirect('http://localhost:5173'));
+        fastify.setNotFoundHandler((req, reply) => {
+            if (req.url.startsWith('/api/')) return reply.status(404).send({ error: 'API route not found' });
+            reply.redirect(`http://localhost:5173${req.url}`);
+        });
+    } else {
+        await fastify.register(staticFiles, {
+            root: join(__dirname, '../dist'),
+            prefix: '/',
+            wildcard: false,
+        });
+        fastify.setNotFoundHandler((req, reply) => {
+            if (req.url.startsWith('/api/')) return reply.status(404).send({ error: 'API route not found' });
+            reply.sendFile('index.html');
+        });
+    }
 
     await fastify.listen({ port, host: '127.0.0.1' });
 
     fastify.server.on('upgrade', (req, socket, head) => {
-        if (req.url?.startsWith('/ws')) {
-            wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
-        } else {
-            socket.destroy();
-        }
+        if (req.url?.startsWith('/ws')) wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+        else socket.destroy();
     });
 
-    const url = `http://localhost:${port}`;
     const mode = storage.isProjectMode ? chalk.cyan('Project Mode') : chalk.yellow('Global Mode');
-    console.log(`${chalk.green('✔')} consolio v${pkg.version} running at ${chalk.underline.cyan(url)}`);
-    console.log(`${chalk.green('✔')} Workspace: ${chalk.dim(storage.consolioDir)} ${mode}`);
+    console.log(`${chalk.green('✔')} consolio API  →  ${chalk.underline.cyan(`http://localhost:${port}`)}`);
+    if (isDev) {
+        console.log(`${chalk.green('✔')} UI dev server →  ${chalk.underline.cyan('http://localhost:5173')}  ${chalk.dim('(npm run dev:ui)')}`);
+    } else {
+        console.log(`${chalk.green('✔')} UI            →  ${chalk.underline.cyan(`http://localhost:${port}`)}`);
+    }
+    console.log(`${chalk.green('✔')} Workspace     →  ${chalk.dim(storage.consolioDir)} ${mode}`);
     console.log('');
     console.log(chalk.dim('  Press Ctrl+C to stop'));
     console.log('');
 
-    if (autoOpen) {
-        try {
-            const { default: open } = await import('open');
-            await open(url);
-        } catch {
-            console.log(chalk.dim(`  Open ${url} in your browser`));
-        }
+    if (autoOpen && !isDev) {
+        try { const { default: open } = await import('open'); await open(`http://localhost:${port}`); }
+        catch { console.log(chalk.dim(`  Open http://localhost:${port} in your browser`)); }
     }
 
-    (async () => {
-        try {
-            const res = await fetch(`https://registry.npmjs.org/${pkg.name}/latest`, {
-                signal: AbortSignal.timeout(6000),
-                headers: { 'User-Agent': `consolio/${pkg.version}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.version && data.version !== pkg.version) {
-                    console.log(
-                        chalk.bgYellow.black(' UPDATE ') +
-                        chalk.yellow(` v${pkg.version} → v${chalk.bold(data.version)} available`)
-                    );
-                    console.log(chalk.dim(`  npm install -g ${pkg.name}@latest`));
-                    console.log('');
-                }
-            }
-        } catch { /* offline or npm registry unavailable — silently skip */ }
-    })();
 
-    process.on('SIGINT', async () => {
-        console.log(chalk.dim('\n  Shutting down consolio...'));
-        await fastify.close();
-        process.exit(0);
-    });
+    const info = await getLatestVersion({ timeout: 6000 });
+    if (info.updateAvailable) {
+        console.log(`Update available: ${info.current} → ${info.latest}`);
+    }
 
     return fastify;
 }

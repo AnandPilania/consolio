@@ -1,6 +1,6 @@
 # ⚡ consolio
 
-> A fast, project-isolated API testing tool. Runs as an `npx` package — no installation bloat, ~30MB RAM.
+> Lightweight, project-isolated API testing tool. Runs as `npx` — no install needed. ~30MB RAM.
 
 ---
 
@@ -15,13 +15,11 @@ npm install -g @pilaniaanand/consolio
 consolio
 ```
 
-Opens at `http://localhost:4242` automatically.
+Opens at `http://localhost:4242`.
 
 ---
 
 ## Project isolation
-
-Store your API collections right alongside your code:
 
 ```bash
 cd my-project
@@ -29,89 +27,44 @@ npx consolio init --name "My API"
 npx consolio          # auto-detects .consolio/ in current dir
 ```
 
-**Commit** `.consolio/collections/` and `.consolio/environments/` to share with your team.  
-History is auto-gitignored.
+Commit `.consolio/collections/` and `.consolio/environments/` to share with your team.
+History is gitignored automatically.
 
 ---
 
-## Features
-
-| | consolio | Postman | Apidog |
-|---|---|---|---|
-| RAM | **~30MB** | ~300MB | ~400MB |
-| npx support | ✅ | ✗ | ✗ |
-| Project isolation | ✅ `.consolio/` | Workspaces | Workspaces |
-| Offline | ✅ | ✅ | ✅ |
-| Multi-tab requests | ✅ | ✅ | ✅ |
-| Pre/post scripts | ✅ | ✅ | ✅ |
-| Test assertions | ✅ | ✅ | ✅ |
-| Copy as cURL | ✅ | ✅ | ✅ |
-| Import cURL/Postman | ✅ | ✅ | ✅ |
-| Collection runner | ✅ | ✅ | ✅ |
-| Browser interceptor | ✅ extension | extension | extension |
-| Drag-to-resize UI | ✅ | ✅ | ✅ |
-| Customisable layout | ✅ | - | - |
-| License | **MIT/Free** | Freemium | Freemium |
-
----
-
-## Project structure
-
-```
-consolio/
-├── bin/
-│   └── consolio.js          # CLI entry point (commander)
-├── server/
-│   ├── index.js             # Fastify server + WebSocket
-│   ├── init.js              # `consolio init` command
-│   ├── storage.js           # JSON file storage
-│   └── routes/
-│       ├── collections.js   # CRUD for collections + requests
-│       ├── environments.js  # CRUD for environments + history + config
-│       └── proxy.js         # /api/execute — proxies HTTP requests
-├── extension/
-│   ├── manifest.json        # Chrome MV3 extension manifest
-│   └── src/
-│       ├── background.js    # Service worker — captures webRequests
-│       ├── popup.html       # Extension popup UI
-│       └── popup.js         # Popup logic
-├── ui-src/                  # Vite + React source (edit this)
-│   ├── index.html
-│   ├── vite.config.js       # Builds to ../ui/
-│   ├── package.json
-│   └── src/
-│       ├── main.jsx
-│       ├── App.jsx          # Root layout — resizable PanelGroup
-│       ├── store/index.js   # Zustand store (all state + persistence)
-│       ├── utils/index.js   # Helpers: uid, buildCurl, parseCurl, runTests, runScript
-│       ├── styles/          # CSS tokens + global reset
-│       └── components/
-│           ├── layout/      # Topbar
-│           ├── sidebar/     # Collections, History, Interceptor + filter rules
-│           ├── request/     # Multi-tab, URL bar, Params/Headers/Body/Auth/Scripts/Tests
-│           ├── response/    # Status, Body (search+highlight), Headers, Test results
-│           ├── modals/      # CustomiseLayout, NewCollection, Import, Runner, Settings
-│           └── shared/      # Icon, Btn, KVTable, Notification, ...
-└── ui/                      # Built UI — served by Fastify (do not edit directly)
-```
-
----
-
-## Development
+## Scripts
 
 ```bash
-# Install server deps
-npm install
+npm install        # install everything (server deps + UI devDeps) in one shot
 
-# Start server
-npm run dev                  # → http://localhost:4242
+npm start          # production: serves dist/ at http://localhost:4242
+npm run build      # compile ui/ → dist/  (run once after clone, or after UI changes)
 
-# UI hot-reload (separate terminal)
-npm run ui:dev               # → http://localhost:5173 (proxies API to :4242)
-
-# Build UI for production
-npm run ui:build             # compiles ui-src/ → ui/
+npm run dev        # development: API server on :4242 + Vite HMR on :5173
+                   # both start simultaneously, logs colour-coded (cyan = api, yellow = ui)
+                   # edit anything in ui/ and the browser updates instantly
 ```
+
+**After cloning:**
+```bash
+npm install && npm run build && npm start
+```
+
+---
+
+## Development workflow
+
+`npm run dev` starts two processes via `concurrently`:
+
+| Process         | Port    | Description                                     |
+| --------------- | ------- | ----------------------------------------------- |
+| API server      | `:4242` | Fastify — handles all `/api/*` and `/ws`        |
+| Vite dev server | `:5173` | React HMR — proxies `/api` and `/ws` to `:4242` |
+
+Open `http://localhost:5173` for hot-reload development.
+The server at `:4242` is API-only in dev mode — it redirects `/` to Vite.
+
+**Environment variable:** `CONSOLIO_DEV=true` puts the server in API-only mode (set automatically by `npm run dev`).
 
 ---
 
@@ -123,19 +76,15 @@ npm run ui:build             # compiles ui-src/ → ui/
 4. Toggle **Capture requests** ON
 5. Intercepted requests appear in the **Tap** sidebar tab
 
-### Interceptor filter rules
+### Filter rules (blacklist / whitelist)
 
-The Tap sidebar supports **blacklist** and **whitelist** modes:
+In the Tap tab, set a mode and add rules:
 
-- **Blacklist** (default) — block requests that match any rule. Useful for filtering out analytics, CDN, or other noise.
-- **Whitelist** — capture *only* requests matching at least one rule. Useful for isolating a specific API domain.
+- **Blacklist** (default) — block requests matching any rule. Good for filtering analytics/CDN noise.
+- **Whitelist** — capture only requests matching at least one rule. Good for isolating one API domain.
 
-Each rule configures:
-- **Target**: URL · Host · Method · Content-Type
-- **Mode**: contains · starts with · ends with · exact · regex
-- **Pattern**: the string or regex to match
-
-Rules persist across sessions.
+Per rule: **Target** (URL / Host / Method / Content-Type) × **Mode** (contains / starts with / ends with / exact / regex).
+Rules persist in localStorage.
 
 ---
 
@@ -143,42 +92,41 @@ Rules persist across sessions.
 
 ```js
 // Pre-request tab — runs before the request is sent
-consolio.setVariable('timestamp', Date.now())
-consolio.setVariable('sig', btoa(consolio.getVariable('secret') + Date.now()))
+consolio.setVariable('ts', Date.now())
 
 // Post-response tab — runs after the response arrives
-const data = JSON.parse(response.body)
-consolio.setVariable('authToken', data.token)
-consolio.log('Got token:', data.token)
+const body = JSON.parse(response.body)
+consolio.setVariable('token', body.access_token)
+consolio.log('Got token:', body.access_token)
 ```
 
-Available API: `consolio.log(...args)`, `consolio.setVariable(key, value)`, `consolio.getVariable(key)`  
-Context: `request` (method, url), `response` (status, body, headers, elapsed), `environment` (current vars)
+**API:** `consolio.log(...args)` · `consolio.setVariable(key, value)` · `consolio.getVariable(key)`
+**Context:** `request` (method, url) · `response` (status, body, headers, elapsed) · `environment`
 
 ---
 
 ## Customise layout
 
-Click the **⊞** icon in the topbar to open the Layout panel:
-- **Drag** panels to reorder (sidebar, request pane, response pane)
-- **Toggle** panel visibility
-- **Resize** with sliders or by dragging the dividers in the UI
-- **Presets**: Default · Focus Request · Focus Response · No Sidebar
+Click **⊞** in the topbar:
+- Drag panels to reorder
+- Toggle panel visibility
+- Resize with sliders, or drag the dividers in the main UI
+- **Presets:** Default · Focus Request · Focus Response · No Sidebar
 
-All preferences persist in localStorage.
+Preferences persist in localStorage.
 
 ---
 
-## CLI reference
+## CLI
 
 ```bash
-consolio                        # Start server (default port 4242)
-consolio start --port 8080      # Custom port
-consolio start --no-open        # Don't auto-open browser
-consolio init                   # Initialize project
-consolio init --name "My App"   # Initialize with project name
-consolio --help
+consolio                      # start server (port 4242)
+consolio start --port 8080    # custom port
+consolio start --no-open      # don't auto-open browser
+consolio init                 # initialise project (.consolio/)
+consolio init --name "My API"
 consolio --version
+consolio --help
 ```
 
 ---

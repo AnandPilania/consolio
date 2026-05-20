@@ -1,0 +1,120 @@
+/* ── Root layout ──────────────────────────────────────────────────────────── */
+.app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-base);
+}
+
+.workspace {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* PanelGroup fills its container */
+.hGroup,
+.vGroup {
+    width: 100%;
+    height: 100%;
+}
+
+.sidebarPanel {
+    overflow: hidden;
+}
+
+.mainPanel {
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* ── Horizontal resize handle (sidebar ↔ main) ────────────────────────────── */
+.hHandle {
+    width: 4px;
+    background: var(--bd-faint);
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s;
+    /* v2 sets data-resize-handle on the element */
+}
+
+.hHandle:hover {
+    background: var(--accent-glow);
+}
+
+/* Active state via v2 data attribute */
+.hHandle[data-resize-handle-active] {
+    background: var(--accent-glow);
+}
+
+/* Visible pip on hover / drag */
+.hHandle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 32px;
+    background: var(--accent);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.hHandle:hover::after,
+.hHandle[data-resize-handle-active]::after {
+    opacity: 1;
+}
+
+/* ── Vertical resize handle (request ↔ response) ─────────────────────────── */
+.vHandle {
+    height: 4px;
+    background: var(--bd-faint);
+    cursor: row-resize;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s;
+}
+
+.vHandle:hover {
+    background: var(--accent-glow);
+}
+
+.vHandle[data-resize-handle-active] {
+    background: var(--accent-glow);
+}
+
+.vHandle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    height: 2px;
+    width: 32px;
+    background: var(--accent);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.vHandle:hover::after,
+.vHandle[data-resize-handle-active]::after {
+    opacity: 1;
+}
+
+/* ── Fallback when all panels hidden ──────────────────────────────────────── */
+.allHidden {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tx-faint);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px;
+}
