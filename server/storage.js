@@ -23,7 +23,7 @@ export class consolioStorage {
         if (!existsSync(join(this.consolioDir, 'config.json'))) {
             writeFileSync(join(this.consolioDir, 'config.json'), JSON.stringify({
                 name: this.isProjectMode ? 'Project' : 'Global Workspace',
-                version: '0.3.2',
+                version: '0.3.3',
                 created: new Date().toISOString(),
                 settings: { defaultEnvironment: null, timeout: 30000, followRedirects: true, sslVerify: true }
             }, null, 2));

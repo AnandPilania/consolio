@@ -21,7 +21,13 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
 
     const isDev = process.env.CONSOLIO_DEV === 'true';
 
-    const fastify = Fastify({ logger: false });
+    const fastify = Fastify({
+        logger: false,
+        // Raise Fastify's default 1MB JSON body limit so multipart file uploads
+        // (sent as base64 inside the /api/execute JSON payload) aren't rejected.
+        // Base64 inflates size ~33%, so 50MB here comfortably covers ~35MB source files.
+        bodyLimit: 50 * 1024 * 1024 // 50MB
+    });
 
     await fastify.register(cors, {
         origin: (origin, cb) => cb(null, true),

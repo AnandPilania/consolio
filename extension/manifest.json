@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "consolio Interceptor",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "description": "Capture browser API requests and send them to consolio for testing",
     "permissions": [
         "webRequest",

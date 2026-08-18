@@ -174,7 +174,8 @@ export function RequestPane() {
 /* ── Body panel ───────────────────────────────────────────────────────────── */
 function BodyPanel({ body, onChange }) {
   const set = (k, v) => onChange({ ...body, [k]: v })
-  const TYPES = ['none', 'json', 'text', 'form', 'raw']
+  const TYPES = ['none', 'json', 'text', 'form', 'multipart', 'raw']
+  const LABELS = { multipart: 'Form Data' }
   return (
     <div className={styles.bodyWrap}>
       <div className={styles.bodyTypeBar}>
@@ -184,13 +185,16 @@ function BodyPanel({ body, onChange }) {
             className={`${styles.bodyType} ${body.type === t ? styles.bodyTypeActive : ''}`}
             onClick={() => set('type', t)}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {LABELS[t] || (t.charAt(0).toUpperCase() + t.slice(1))}
           </button>
         ))}
       </div>
       {body.type === 'none' && <Empty icon="📭" text="No body" sub="Select a body type above" />}
       {body.type === 'form' && (
         <KVTable rows={body.fields || []} onChange={v => set('fields', v)} placeholder={['Field', 'Value']} />
+      )}
+      {body.type === 'multipart' && (
+        <MultipartTable rows={body.fields || []} onChange={v => set('fields', v)} />
       )}
       {['json', 'text', 'raw'].includes(body.type) && (
         <textarea
@@ -200,6 +204,81 @@ function BodyPanel({ body, onChange }) {
           onChange={e => set('content', e.target.value)}
         />
       )}
+    </div>
+  )
+}
+
+/* ── Multipart / form-data table (text fields + file fields) ────────────────── */
+function MultipartTable({ rows, onChange }) {
+  const update = (i, patch) => onChange(rows.map((r, j) => j === i ? { ...r, ...patch } : r))
+  const del    = i => onChange(rows.filter((_, j) => j !== i))
+  const add    = () => onChange([...rows, { id: uid(), key: '', value: '', type: 'text', enabled: true }])
+
+  const readFile = (i, file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      // reader.result is "data:<mime>;base64,<data>" — strip the prefix, keep raw base64.
+      const base64 = String(reader.result).split(',')[1] || ''
+      update(i, { fileName: file.name, fileType: file.type || 'application/octet-stream', fileSize: file.size, fileData: base64 })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className={styles.kvWrap}>
+      <div className={styles.kvTable}>
+        {rows.map((r, i) => (
+          <div key={r.id || i} className={styles.multipartRow}>
+            <input
+              type="checkbox"
+              className={styles.kvCheck}
+              checked={r.enabled}
+              onChange={e => update(i, { enabled: e.target.checked })}
+            />
+            <input
+              className={styles.kvInput}
+              placeholder="Field"
+              value={r.key || ''}
+              onChange={e => update(i, { key: e.target.value })}
+            />
+            <select
+              className={styles.multipartType}
+              value={r.type || 'text'}
+              onChange={e => update(i, { type: e.target.value, value: '', fileName: undefined, fileType: undefined, fileData: undefined })}
+            >
+              <option value="text">Text</option>
+              <option value="file">File</option>
+            </select>
+            {r.type === 'file' ? (
+              <label className={styles.filePicker}>
+                <Icon name="upload" size={12} />
+                <span className={styles.filePickerLabel}>
+                  {r.fileName || 'Choose file…'}
+                </span>
+                <input
+                  type="file"
+                  className={styles.fileInputHidden}
+                  onChange={e => readFile(i, e.target.files?.[0])}
+                />
+              </label>
+            ) : (
+              <input
+                className={styles.kvInput}
+                placeholder="Value"
+                value={r.value || ''}
+                onChange={e => update(i, { value: e.target.value })}
+              />
+            )}
+            <button className={styles.iconBtnDangerRow} onClick={() => del(i)}>
+              <Icon name="x" size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button className={styles.addRowBtn} onClick={add}>
+        <Icon name="plus" size={11} /> Add Field
+      </button>
     </div>
   )
 }
