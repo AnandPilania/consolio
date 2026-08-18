@@ -1,6 +1,6 @@
 {
     "name": "@pilaniaanand/consolio",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "description": "Lightweight, project-isolated API testing tool — a fast Postman alternative",
     "keywords": [
         "api",
@@ -19,6 +19,13 @@
     "bin": {
         "consolio": "./bin/consolio.js"
     },
+    "files": [
+        "bin",
+        "server",
+        "dist",
+        "extension",
+        "README.md"
+    ],
     "type": "module",
     "main": "./server/index.js",
     "scripts": {

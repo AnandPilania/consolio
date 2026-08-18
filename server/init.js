@@ -17,7 +17,7 @@ export async function initProject({ name = 'My Project' } = {}) {
 
     writeFileSync(join(consolioDir, 'config.json'), JSON.stringify({
         name,
-        version: '0.3.1',
+        version: '0.3.2',
         created: new Date().toISOString(),
         settings: { defaultEnvironment: null, timeout: 30000, followRedirects: true, sslVerify: true }
     }, null, 2));
