@@ -17,7 +17,7 @@ export async function initProject({ name = 'My Project' } = {}) {
 
     writeFileSync(join(consolioDir, 'config.json'), JSON.stringify({
         name,
-        version: '0.1.0',
+        version: '0.3.1',
         created: new Date().toISOString(),
         settings: { defaultEnvironment: null, timeout: 30000, followRedirects: true, sslVerify: true }
     }, null, 2));
@@ -54,7 +54,7 @@ export async function initProject({ name = 'My Project' } = {}) {
         id: 'development', name: 'Development', color: '#22c55e',
         variables: [
             { key: 'BASE_URL', value: 'http://localhost:3000', enabled: true, secret: false },
-            { key: 'API_KEY',  value: '',                      enabled: true, secret: true  }
+            { key: 'API_KEY', value: '', enabled: true, secret: true }
         ]
     }, null, 2));
 
