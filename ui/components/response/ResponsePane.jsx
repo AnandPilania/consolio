@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store'
 import { Icon, IconBtn, Empty, Spinner } from '../shared'
 import { syntaxHighlight, fmtSize, fmtTime } from '../../utils'
@@ -23,6 +23,18 @@ export function ResponsePane() {
   const passCount  = testResults.filter(r => r.pass).length
   const failCount  = testResults.filter(r => !r.pass && r.ran).length
   const totalTests = testResults.length
+
+  const previewableType = response ? ['html', 'image'].includes(response.bodyType) : false
+  const imageMime = response?.headers?.['content-type']?.split(';')[0]?.trim() || 'image/png'
+
+  // Default to the Preview tab whenever a new previewable response arrives.
+  // Keyed on historyId so switching sub-tabs manually afterwards isn't overridden
+  // until the *next* request completes.
+  useEffect(() => {
+    if (previewableType) setResTab('preview')
+    else if (resTab === 'preview') setResTab('body')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [response?.historyId])
 
   /* Loading */
   if (loading) return (
@@ -81,6 +93,11 @@ export function ResponsePane() {
 
       {/* ── Sub-tabs ────────────────────────────────────────────────────── */}
       <div className={styles.tabs}>
+        {previewableType && (
+          <button className={`${styles.tab} ${resTab === 'preview' ? styles.tabActive : ''}`} onClick={() => setResTab('preview')}>
+            <Icon name="eye" size={12} /> Preview
+          </button>
+        )}
         <button className={`${styles.tab} ${resTab === 'body'    ? styles.tabActive : ''}`} onClick={() => setResTab('body')}>
           Body
         </button>
@@ -104,6 +121,9 @@ export function ResponsePane() {
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <div className={styles.body}>
+        {resTab === 'preview' && (
+          <PreviewView body={response.body} bodyType={response.bodyType} imageMime={imageMime} requestUrl={response.finalUrl} method={tab.method} />
+        )}
         {resTab === 'body' && (
           <BodyView body={response.body} bodyType={response.bodyType} search={search} />
         )}
@@ -165,6 +185,58 @@ function SearchBar({ query, onChange, body }) {
   )
 }
 
+/* ── Preview view (HTML iframe / image) ──────────────────────────────────── */
+function PreviewView({ body, bodyType, imageMime, requestUrl, method }) {
+  if (bodyType === 'html') {
+    // Two rendering strategies:
+    //
+    // 1. Live navigation (src=URL) — the iframe actually navigates the browser to the real
+    //    URL. This is the only way a full app (cookie-based session, cross-origin JS bundles,
+    //    relative asset paths) renders correctly, because the browser then has a real origin
+    //    to attach cookies to and resolve relative/absolute asset URLs against. Only valid
+    //    for GET requests — an iframe navigation can't replay a POST body or custom headers,
+    //    so what loads may differ slightly from the captured response (e.g. no auth header
+    //    consolio added). Standard X-Frame-Options / frame-ancestors CSP on the target site
+    //    can still block this, same as it would in any other embedding context.
+    //
+    // 2. Captured HTML (srcDoc) — renders the exact bytes consolio received, sandboxed with
+    //    no same-origin access. Reliable for static/server-rendered fragments, but a full SPA
+    //    won't fully function (its own cross-origin asset fetches still hit real CORS rules,
+    //    and it has no cookie jar to run against).
+    const canNavigate = method === 'GET' && requestUrl
+    if (canNavigate) {
+      return (
+        <iframe
+          className={styles.previewFrame}
+          src={requestUrl}
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+          title="Response preview"
+        />
+      )
+    }
+    return (
+      <iframe
+        className={styles.previewFrame}
+        srcDoc={body || ''}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        title="Response preview"
+      />
+    )
+  }
+  if (bodyType === 'image') {
+    return (
+      <div className={styles.previewImageWrap}>
+        <img
+          className={styles.previewImage}
+          src={`data:${imageMime};base64,${body || ''}`}
+          alt="Response preview"
+        />
+      </div>
+    )
+  }
+  return null
+}
+
 /* ── Body view ────────────────────────────────────────────────────────────── */
 function BodyView({ body, bodyType, search }) {
   const highlighted = useMemo(() => {
@@ -187,6 +259,10 @@ function BodyView({ body, bodyType, search }) {
       )
     } catch { return highlighted }
   }, [highlighted, search])
+
+  if (bodyType === 'image') {
+    return <Empty icon="🖼" text="Binary image data" sub="Switch to the Preview tab to view it" />
+  }
 
   return (
     <pre
