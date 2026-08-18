@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { Icon, IconBtn, Empty, Spinner } from '../shared'
 import { syntaxHighlight, fmtSize, fmtTime } from '../../utils'
@@ -9,6 +9,7 @@ export function ResponsePane() {
   const activeTabId = useStore(s => s.activeTabId)
   const tab         = tabs.find(t => t.id === activeTabId) || tabs[0]
   const showNotif   = useStore(s => s.showNotif)
+  const previewLiveRender = useStore(s => s.config?.settings?.previewLiveRender === true)
   const { response, loading, testResults = [] } = tab
 
   const [resTab,      setResTab]      = useState('body')
@@ -122,7 +123,11 @@ export function ResponsePane() {
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <div className={styles.body}>
         {resTab === 'preview' && (
-          <PreviewView body={response.body} bodyType={response.bodyType} imageMime={imageMime} requestUrl={response.finalUrl} method={tab.method} />
+          <PreviewView
+            body={response.body} bodyType={response.bodyType} imageMime={imageMime}
+            requestUrl={response.finalUrl} method={tab.method}
+            liveRender={previewLiveRender}
+          />
         )}
         {resTab === 'body' && (
           <BodyView body={response.body} bodyType={response.bodyType} search={search} />
@@ -186,42 +191,26 @@ function SearchBar({ query, onChange, body }) {
 }
 
 /* ── Preview view (HTML iframe / image) ──────────────────────────────────── */
-function PreviewView({ body, bodyType, imageMime, requestUrl, method }) {
+function PreviewView({ body, bodyType, imageMime, requestUrl, method, liveRender }) {
   if (bodyType === 'html') {
-    // Two rendering strategies:
+    // Two rendering strategies, chosen by the "Preview: live render" setting:
     //
-    // 1. Live navigation (src=URL) — the iframe actually navigates the browser to the real
-    //    URL. This is the only way a full app (cookie-based session, cross-origin JS bundles,
-    //    relative asset paths) renders correctly, because the browser then has a real origin
-    //    to attach cookies to and resolve relative/absolute asset URLs against. Only valid
-    //    for GET requests — an iframe navigation can't replay a POST body or custom headers,
-    //    so what loads may differ slightly from the captured response (e.g. no auth header
-    //    consolio added). Standard X-Frame-Options / frame-ancestors CSP on the target site
-    //    can still block this, same as it would in any other embedding context.
+    // 1. Live navigation (src=URL, liveRender on) — the iframe actually navigates the
+    //    browser to the real URL. This is the only way a full app (cookie-based session,
+    //    cross-origin JS bundles, relative asset paths) renders correctly, because the
+    //    browser then has a real origin to attach cookies to and resolve asset URLs
+    //    against. Only valid for GET — an iframe navigation can't replay a POST body or
+    //    custom headers. Requires allow-same-origin, meaning the preview frame can read/
+    //    write cookies and storage for that site, same as opening it in a normal tab.
     //
-    // 2. Captured HTML (srcDoc) — renders the exact bytes consolio received, sandboxed with
-    //    no same-origin access. Reliable for static/server-rendered fragments, but a full SPA
-    //    won't fully function (its own cross-origin asset fetches still hit real CORS rules,
-    //    and it has no cookie jar to run against).
-    const canNavigate = method === 'GET' && requestUrl
-    if (canNavigate) {
-      return (
-        <iframe
-          className={styles.previewFrame}
-          src={requestUrl}
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-          title="Response preview"
-        />
-      )
-    }
-    return (
-      <iframe
-        className={styles.previewFrame}
-        srcDoc={body || ''}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-        title="Response preview"
-      />
-    )
+    // 2. Captured HTML (srcDoc, liveRender off / non-GET) — renders the exact bytes
+    //    consolio received, sandboxed with no same-origin access. Reliable for static/
+    //    server-rendered fragments; a full SPA won't fully function since its own
+    //    cross-origin asset fetches still hit real CORS rules and it has no cookie jar.
+    const canNavigate = liveRender && method === 'GET' && requestUrl
+    return canNavigate
+      ? <LiveFrame url={requestUrl} />
+      : <SandboxedFrame html={body} />
   }
   if (bodyType === 'image') {
     return (
@@ -235,6 +224,68 @@ function PreviewView({ body, bodyType, imageMime, requestUrl, method }) {
     )
   }
   return null
+}
+
+/* Live navigation frame — real page load, used only when Preview: live render is on. */
+function LiveFrame({ url }) {
+  const [blocked, setBlocked] = useState(false)
+  const [loaded,  setLoaded]  = useState(false)
+  const loadedRef = useRef(false)
+
+  useEffect(() => {
+    loadedRef.current = false
+    setBlocked(false)
+    setLoaded(false)
+    // X-Frame-Options / frame-ancestors CSP blocks are silent — no error event fires on
+    // the iframe element itself, the browser just shows an empty frame. There's no direct
+    // way to detect this from the parent (cross-origin access to the frame is blocked by
+    // design), so we fall back to a load-timeout heuristic: if `load` hasn't fired within
+    // a few seconds, assume the navigation was refused and show a fallback message instead
+    // of leaving the person staring at a blank panel with no explanation.
+    const timer = setTimeout(() => { if (!loadedRef.current) setBlocked(true) }, 4000)
+    return () => clearTimeout(timer)
+  }, [url])
+
+  const handleLoad = () => {
+    loadedRef.current = true
+    setLoaded(true)
+    setBlocked(false)
+  }
+
+  return (
+    <div className={styles.previewFrameWrap}>
+      <iframe
+        key={url /* force remount on URL change so the load/blocked state resets cleanly */}
+        className={styles.previewFrame}
+        src={url}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        title="Response preview"
+        onLoad={handleLoad}
+      />
+      {blocked && !loaded && (
+        <div className={styles.previewBlocked}>
+          <Empty
+            icon="🚫"
+            text="This page can't be previewed here"
+            sub="The site likely sends X-Frame-Options or a Content-Security-Policy that blocks embedding — the same protection that stops clickjacking on any site. Open it in a new tab, or check the Body tab for the raw response."
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* Sandboxed captured-HTML frame — no same-origin, used when live render is off or the
+   request wasn't a GET (an iframe navigation can't replay POST bodies/headers). */
+function SandboxedFrame({ html }) {
+  return (
+    <iframe
+      className={styles.previewFrame}
+      srcDoc={html || ''}
+      sandbox="allow-scripts allow-popups allow-forms"
+      title="Response preview"
+    />
+  )
 }
 
 /* ── Body view ────────────────────────────────────────────────────────────── */

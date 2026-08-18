@@ -326,6 +326,22 @@ export function SettingsModal() {
               <option value="false">Disabled</option>
             </Select>
           </FormGroup>
+          <FormGroup label="Preview: live render">
+            <Select
+              value={String(form.settings?.previewLiveRender === true)}
+              onChange={e => setForm(f => ({ ...f, settings: { ...(f.settings || {}), previewLiveRender: e.target.value === 'true' } }))}
+            >
+              <option value="false">Off — sandboxed, isolated from consolio</option>
+              <option value="true">On — full app rendering (SPAs, cookies)</option>
+            </Select>
+          </FormGroup>
+          <p className={styles.settingsHint}>
+            When on, GET responses previewed as HTML navigate the browser directly to
+            the request URL — needed for apps with their own scripts, cookies, and
+            cross-origin assets to render correctly. That preview frame can then read
+            and write cookies/storage for that site, same as a normal browser tab. Off
+            is safer for previewing untrusted or third-party APIs.
+          </p>
         </div>
       </section>
 

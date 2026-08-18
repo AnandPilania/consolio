@@ -2,6 +2,7 @@ import { useStore } from '../../store'
 import { Icon, IconBtn, KVTable, FormGroup, Input, Select, Empty } from '../shared'
 import { uid, buildCurl } from '../../utils'
 import styles from './RequestPane.module.css'
+import sharedStyles from '../shared/Shared.module.css'
 
 export function RequestPane() {
   const tabs         = useStore(s => s.tabs)
@@ -226,18 +227,18 @@ function MultipartTable({ rows, onChange }) {
   }
 
   return (
-    <div className={styles.kvWrap}>
-      <div className={styles.kvTable}>
+    <div className={sharedStyles.kvWrap}>
+      <div className={sharedStyles.kvTable}>
         {rows.map((r, i) => (
           <div key={r.id || i} className={styles.multipartRow}>
             <input
               type="checkbox"
-              className={styles.kvCheck}
+              className={sharedStyles.kvCheck}
               checked={r.enabled}
               onChange={e => update(i, { enabled: e.target.checked })}
             />
             <input
-              className={styles.kvInput}
+              className={sharedStyles.kvInput}
               placeholder="Field"
               value={r.key || ''}
               onChange={e => update(i, { key: e.target.value })}
@@ -264,7 +265,7 @@ function MultipartTable({ rows, onChange }) {
               </label>
             ) : (
               <input
-                className={styles.kvInput}
+                className={sharedStyles.kvInput}
                 placeholder="Value"
                 value={r.value || ''}
                 onChange={e => update(i, { value: e.target.value })}
@@ -276,8 +277,8 @@ function MultipartTable({ rows, onChange }) {
           </div>
         ))}
       </div>
-      <button className={styles.addRowBtn} onClick={add}>
-        <Icon name="plus" size={11} /> Add Field
+      <button className={sharedStyles.addRowBtn} onClick={add}>
+        <Icon name="plus" size={11} /> Add Row
       </button>
     </div>
   )

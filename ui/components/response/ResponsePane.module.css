@@ -216,6 +216,21 @@
     background: #fff;
 }
 
+.previewFrameWrap {
+    position: relative;
+    height: 100%;
+}
+
+.previewBlocked {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-base);
+    padding: 24px;
+}
+
 .previewImageWrap {
     height: 100%;
     display: flex;

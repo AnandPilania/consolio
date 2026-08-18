@@ -1,34 +1,71 @@
 .topbar {
-  height: var(--topbar-h);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--bd-faint);
-  display: flex; align-items: center;
-  padding: 0 12px; gap: 8px;
-  flex-shrink: 0; z-index: 20;
+    height: var(--topbar-h);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--bd-faint);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+    z-index: 20;
 }
+
 .logo {
-  display: flex; align-items: center; gap: 6px;
-  font-weight: 700; font-size: 14px; letter-spacing: -.4px;
-  color: var(--tx-base);
-  padding-right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -.4px;
+    color: var(--tx-base);
+    padding-right: 8px;
 }
+
 .projectBadge {
-  font-size: 11px; color: var(--tx-faint);
-  background: var(--bg-raised); border: 1px solid var(--bd-faint);
-  padding: 2px 8px; border-radius: 99px;
+    font-size: 11px;
+    color: var(--tx-faint);
+    background: var(--bg-raised);
+    border: 1px solid var(--bd-faint);
+    padding: 2px 8px;
+    border-radius: 99px;
 }
-.spacer { flex: 1; }
+
+.spacer {
+    flex: 1;
+}
+
 .envPicker {
-  display: flex; align-items: center; gap: 5px;
-  background: var(--bg-raised); border: 1px solid var(--bd-subtle);
-  border-radius: var(--r-md); padding: 4px 8px;
-  transition: border-color .15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-raised);
+    border: 1px solid var(--bd-subtle);
+    border-radius: var(--r-md);
+    padding: 4px 8px;
+    transition: border-color .15s;
 }
-.envPicker:hover { border-color: var(--bd-base); }
-.envDot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.envPicker:hover {
+    border-color: var(--bd-base);
+}
+
+.envDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
 .envSelect {
-  background: none; border: none; color: var(--tx-muted);
-  font-size: 12px; font-family: var(--font-ui); cursor: pointer;
-  appearance: none;
+    background: none;
+    border: none;
+    color: var(--tx-muted);
+    font-size: 12px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    appearance: none;
 }
-.envSelect:focus { outline: none; }
+
+.envSelect:focus {
+    outline: none;
+}
