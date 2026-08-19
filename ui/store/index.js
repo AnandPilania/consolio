@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { uid, buildCurl, parseCurl, importPostmanCollection, runTests, runScript } from '../utils'
+import { uid, buildCurl, parseCurl, importPostmanCollection } from '../utils'
 
 const DEFAULT_PANELS = {
     sidebar: { visible: true, size: 256, minSize: 180, maxSize: 480, order: 0 },
@@ -40,6 +40,22 @@ export function makeTab(overrides = {}) {
         activeReq: null,
         reqName: '',
         reqTab: 'params',
+        wsMode: false,
+        wsFrames: [],
+        wsConnected: false,
+        sseMode: false,
+        sseFrames: [],
+        sseConnected: false,
+        sioMode: false,
+        sioFrames: [],
+        sioConnected: false,
+        grpcMode: false,
+        grpcProtoText: '',
+        grpcMethodPath: '',
+        grpcRequestJson: '',
+        grpcMethods: [],
+        grpcFrames: [],
+        grpcConnected: false,
         ...overrides,
     }
 }
@@ -66,6 +82,9 @@ export const useStore = create(
             activeEnvId: null,
             history: [],
             config: { name: 'Workspace', isProjectMode: false },
+
+            /* Live WebSocket connections, keyed by tab id — not persisted (real live sockets) */
+            wsSockets: {},
 
             /* Tabs */
             tabs: [makeTab()],
@@ -136,16 +155,11 @@ export const useStore = create(
 
             /* ── Request send ──────────────────────────────────────────────────── */
             async sendRequest() {
-                const { getActiveTab, getEnvVars, updateTab, showNotif } = get()
+                const { getActiveTab, getEnvVars, activeEnvId, updateTab, showNotif } = get()
                 const tab = getActiveTab()
                 if (!tab.url.trim()) { showNotif('Enter a URL first', 'error'); return }
 
-                const envVars = getEnvVars()
-                const preResult = runScript(tab.preScript, { envVars: { ...envVars }, request: { method: tab.method, url: tab.url } })
-                if (preResult.error) showNotif('Pre-script: ' + preResult.error, 'error')
-                const mergedEnv = { ...envVars, ...preResult.modified }
-
-                updateTab(tab.id, { loading: true, response: null, preLogs: preResult.logs })
+                updateTab(tab.id, { loading: true, response: null })
 
                 try {
                     const res = await apiFetch('/api/execute', {
@@ -154,16 +168,226 @@ export const useStore = create(
                             method: tab.method, url: tab.url.trim(),
                             headers: tab.headers, params: tab.params,
                             body: tab.body, auth: tab.auth,
-                            environment: mergedEnv, saveToHistory: true,
+                            environment: getEnvVars(), saveToHistory: true,
+                            preScript: tab.preScript, postScript: tab.postScript,
+                            tests: tab.tests, environmentId: activeEnvId,
                         }
                     })
-                    const testResults = runTests(tab.tests, res)
-                    const postResult = runScript(tab.postScript, { envVars: mergedEnv, request: { method: tab.method, url: tab.url }, response: res })
-                    if (postResult.error) showNotif('Post-script: ' + postResult.error, 'error')
-                    updateTab(tab.id, { response: res, loading: false, testResults, postLogs: postResult.logs })
-                    apiFetch('/api/history?limit=30').then(h => set({ history: h })).catch(() => { })
+                    if (res.preScriptError) showNotif('Pre-script: ' + res.preScriptError, 'error')
+                    if (res.postScriptError) showNotif('Post-script: ' + res.postScriptError, 'error')
+                    updateTab(tab.id, {
+                        response: res, loading: false,
+                        testResults: res.testResults || [],
+                        preLogs: res.preLogs || [], postLogs: res.postLogs || [],
+                    })
+                    if (!res.error) apiFetch('/api/history?limit=30').then(h => set({ history: h })).catch(() => { })
+                    if (activeEnvId && res.environment) {
+                        apiFetch('/api/environments').then(envs => set({ environments: envs })).catch(() => { })
+                    }
                 } catch (e) {
                     updateTab(tab.id, { response: { error: e.message }, loading: false, testResults: [] })
+                }
+            },
+
+            /* ── WebSocket (server proxies the real connection; see server/wsProxy.js) ── */
+            appendWsFrame(tabId, frame) {
+                set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, wsFrames: [...(t.wsFrames || []), frame].slice(-500) } : t) }))
+            },
+            clearWsFrames() {
+                const { getActiveTab, updateTab } = get()
+                updateTab(getActiveTab().id, { wsFrames: [] })
+            },
+            connectWs(url) {
+                const { getActiveTab, updateTab, appendWsFrame, disconnectWs, showNotif } = get()
+                const tab = getActiveTab()
+                if (!url?.trim()) { showNotif('Enter a WebSocket URL first', 'error'); return }
+                disconnectWs()
+                const tabId = tab.id
+                const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+                const sock = new WebSocket(`${proto}://${window.location.host}/ws?type=${encodeURIComponent('ws-proxy:' + tabId)}`)
+                sock.onopen = () => {
+                    const headerMap = Object.fromEntries((tab.headers || []).filter(h => h.enabled && h.key).map(h => [h.key, h.value]))
+                    sock.send(JSON.stringify({ action: 'connect', url: url.trim(), headers: headerMap }))
+                }
+                sock.onmessage = (ev) => {
+                    let msg; try { msg = JSON.parse(ev.data) } catch { return }
+                    if (msg.action === 'status') {
+                        updateTab(tabId, { wsConnected: !!msg.connected })
+                        if (msg.error) { showNotif('WebSocket: ' + msg.error, 'error'); appendWsFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: `Error: ${msg.error}` }) }
+                        else appendWsFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: msg.connected ? 'Connected' : 'Disconnected' })
+                    } else if (msg.action === 'message') {
+                        appendWsFrame(tabId, { id: uid(), direction: msg.direction || 'in', timestamp: msg.timestamp || Date.now(), data: msg.data })
+                    }
+                }
+                sock.onclose = () => updateTab(tabId, { wsConnected: false })
+                set(s => ({ wsSockets: { ...s.wsSockets, [tabId]: sock } }))
+            },
+            disconnectWs() {
+                const { getActiveTab, wsSockets } = get()
+                const tabId = getActiveTab().id
+                const sock = wsSockets[tabId]
+                if (sock) {
+                    try { sock.close() } catch { }
+                    set(s => { const n = { ...s.wsSockets }; delete n[tabId]; return { wsSockets: n } })
+                }
+            },
+            sendWsMessage(data) {
+                const { getActiveTab, wsSockets, showNotif } = get()
+                const sock = wsSockets[getActiveTab().id]
+                if (sock && sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ action: 'send', data }))
+                else showNotif('Not connected', 'error')
+            },
+
+            /* ── SSE (same server-proxied model as WebSocket, one-way) ───────────── */
+            appendSseFrame(tabId, frame) {
+                set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, sseFrames: [...(t.sseFrames || []), frame].slice(-500) } : t) }))
+            },
+            clearSseFrames() {
+                const { getActiveTab, updateTab } = get()
+                updateTab(getActiveTab().id, { sseFrames: [] })
+            },
+            connectSse(url) {
+                const { getActiveTab, updateTab, appendSseFrame, disconnectSse, showNotif } = get()
+                const tab = getActiveTab()
+                if (!url?.trim()) { showNotif('Enter a URL first', 'error'); return }
+                disconnectSse()
+                const tabId = tab.id
+                const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+                const sock = new WebSocket(`${proto}://${window.location.host}/ws?type=${encodeURIComponent('sse-proxy:' + tabId)}`)
+                sock.onopen = () => {
+                    const headerMap = Object.fromEntries((tab.headers || []).filter(h => h.enabled && h.key).map(h => [h.key, h.value]))
+                    sock.send(JSON.stringify({ action: 'connect', url: url.trim(), headers: headerMap }))
+                }
+                sock.onmessage = (ev) => {
+                    let msg; try { msg = JSON.parse(ev.data) } catch { return }
+                    if (msg.action === 'status') {
+                        updateTab(tabId, { sseConnected: !!msg.connected })
+                        if (msg.error) { showNotif('SSE: ' + msg.error, 'error'); appendSseFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: `Error: ${msg.error}` }) }
+                        else appendSseFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: msg.connected ? 'Connected' : 'Stream closed' })
+                    } else if (msg.action === 'message') {
+                        appendSseFrame(tabId, { id: uid(), direction: 'in', timestamp: msg.timestamp || Date.now(), data: msg.data })
+                    }
+                }
+                sock.onclose = () => updateTab(tabId, { sseConnected: false })
+                set(s => ({ wsSockets: { ...s.wsSockets, [`sse:${tabId}`]: sock } }))
+            },
+            disconnectSse() {
+                const { getActiveTab, wsSockets } = get()
+                const key = `sse:${getActiveTab().id}`
+                const sock = wsSockets[key]
+                if (sock) {
+                    try { sock.close() } catch { }
+                    set(s => { const n = { ...s.wsSockets }; delete n[key]; return { wsSockets: n } })
+                }
+            },
+
+            /* ── Socket.io (event-based — same server-proxied model, plus an event name) ── */
+            appendSioFrame(tabId, frame) {
+                set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, sioFrames: [...(t.sioFrames || []), frame].slice(-500) } : t) }))
+            },
+            clearSioFrames() {
+                const { getActiveTab, updateTab } = get()
+                updateTab(getActiveTab().id, { sioFrames: [] })
+            },
+            connectSio(url) {
+                const { getActiveTab, updateTab, appendSioFrame, disconnectSio, showNotif } = get()
+                const tab = getActiveTab()
+                if (!url?.trim()) { showNotif('Enter a URL first', 'error'); return }
+                disconnectSio()
+                const tabId = tab.id
+                const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+                const sock = new WebSocket(`${proto}://${window.location.host}/ws?type=${encodeURIComponent('sio-proxy:' + tabId)}`)
+                sock.onopen = () => {
+                    const headerMap = Object.fromEntries((tab.headers || []).filter(h => h.enabled && h.key).map(h => [h.key, h.value]))
+                    sock.send(JSON.stringify({ action: 'connect', url: url.trim(), headers: headerMap }))
+                }
+                sock.onmessage = (ev) => {
+                    let msg; try { msg = JSON.parse(ev.data) } catch { return }
+                    if (msg.action === 'status') {
+                        updateTab(tabId, { sioConnected: !!msg.connected })
+                        if (msg.error) { showNotif('Socket.io: ' + msg.error, 'error'); appendSioFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: `Error: ${msg.error}` }) }
+                        else appendSioFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: msg.connected ? 'Connected' : 'Disconnected' })
+                    } else if (msg.action === 'message') {
+                        const dataStr = typeof msg.data === 'string' ? msg.data : JSON.stringify(msg.data)
+                        appendSioFrame(tabId, { id: uid(), direction: msg.direction || 'in', timestamp: msg.timestamp || Date.now(), data: `[${msg.event}] ${dataStr}` })
+                    }
+                }
+                sock.onclose = () => updateTab(tabId, { sioConnected: false })
+                set(s => ({ wsSockets: { ...s.wsSockets, [`sio:${tabId}`]: sock } }))
+            },
+            disconnectSio() {
+                const { getActiveTab, wsSockets } = get()
+                const key = `sio:${getActiveTab().id}`
+                const sock = wsSockets[key]
+                if (sock) {
+                    try { sock.close() } catch { }
+                    set(s => { const n = { ...s.wsSockets }; delete n[key]; return { wsSockets: n } })
+                }
+            },
+            emitSio(event, data) {
+                const { getActiveTab, wsSockets, showNotif } = get()
+                const sock = wsSockets[`sio:${getActiveTab().id}`]
+                if (sock && sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ action: 'emit', event, data }))
+                else showNotif('Not connected', 'error')
+            },
+
+            /* ── gRPC (proto pasted in, method picked by full path "pkg.Service/Method") ── */
+            appendGrpcFrame(tabId, frame) {
+                set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, grpcFrames: [...(t.grpcFrames || []), frame].slice(-500) } : t) }))
+            },
+            clearGrpcFrames() {
+                const { getActiveTab, updateTab } = get()
+                updateTab(getActiveTab().id, { grpcFrames: [] })
+            },
+            // Lazily opens (or reuses) the per-tab gRPC control channel, then sends `action`
+            // once it's open — used by both loadGrpcProto() and callGrpc().
+            grpcSend(action) {
+                const { getActiveTab, updateTab, appendGrpcFrame, showNotif } = get()
+                const tabId = getActiveTab().id
+                const key = `grpc:${tabId}`
+                let sock = get().wsSockets[key]
+                const doSend = () => sock.send(JSON.stringify(action))
+                if (sock && sock.readyState === WebSocket.OPEN) { doSend(); return }
+                if (!sock || sock.readyState >= WebSocket.CLOSING) {
+                    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+                    sock = new WebSocket(`${proto}://${window.location.host}/ws?type=${encodeURIComponent('grpc-proxy:' + tabId)}`)
+                    sock.onmessage = (ev) => {
+                        let msg; try { msg = JSON.parse(ev.data) } catch { return }
+                        if (msg.action === 'schema') {
+                            updateTab(tabId, { grpcMethods: msg.methods || [] })
+                            if (msg.error) showNotif('gRPC: ' + msg.error, 'error')
+                        } else if (msg.action === 'status') {
+                            updateTab(tabId, { grpcConnected: !!msg.connected })
+                            if (msg.error) { showNotif('gRPC: ' + msg.error, 'error'); appendGrpcFrame(tabId, { id: uid(), direction: 'system', timestamp: Date.now(), data: `Error: ${msg.error}` }) }
+                        } else if (msg.action === 'message') {
+                            appendGrpcFrame(tabId, { id: uid(), direction: 'in', timestamp: msg.timestamp || Date.now(), data: JSON.stringify(msg.data) })
+                        }
+                    }
+                    sock.onclose = () => updateTab(tabId, { grpcConnected: false })
+                    set(s => ({ wsSockets: { ...s.wsSockets, [key]: sock } }))
+                }
+                sock.addEventListener('open', doSend, { once: true })
+            },
+            loadGrpcProto() {
+                const { getActiveTab, grpcSend, showNotif } = get()
+                const tab = getActiveTab()
+                if (!tab.grpcProtoText?.trim()) { showNotif('Paste a .proto file first', 'error'); return }
+                grpcSend({ action: 'loadProto', protoText: tab.grpcProtoText })
+            },
+            callGrpc() {
+                const { getActiveTab, grpcSend, showNotif } = get()
+                const tab = getActiveTab()
+                if (!tab.url?.trim()) { showNotif('Enter the target address (host:port)', 'error'); return }
+                if (!tab.grpcMethodPath?.trim()) { showNotif('Pick a method first', 'error'); return }
+                grpcSend({ action: 'call', address: tab.url.trim(), protoText: tab.grpcProtoText, methodPath: tab.grpcMethodPath, requestJson: tab.grpcRequestJson })
+            },
+            disconnectGrpc() {
+                const { getActiveTab, wsSockets } = get()
+                const key = `grpc:${getActiveTab().id}`
+                const sock = wsSockets[key]
+                if (sock) {
+                    try { sock.close() } catch { }
+                    set(s => { const n = { ...s.wsSockets }; delete n[key]; return { wsSockets: n } })
                 }
             },
 
@@ -184,6 +408,10 @@ export const useStore = create(
                     reqName: req.name || '',
                     response: null, testResults: [], preLogs: [], postLogs: [],
                     reqTab: 'params',
+                    // Protocol mode isn't a persisted field on saved requests — always land
+                    // back in plain HTTP mode when opening one, even if this tab was previously
+                    // left in WS/SSE/Socket.IO/gRPC mode.
+                    wsMode: false, sseMode: false, sioMode: false, grpcMode: false,
                 })
             },
             async saveRequest() {

@@ -6,7 +6,7 @@ import { Sidebar }        from './components/sidebar/Sidebar'
 import { RequestPane }    from './components/request/RequestPane'
 import { ResponsePane }   from './components/response/ResponsePane'
 import { CustomiseModal } from './components/modals/CustomiseModal'
-import { NewCollectionModal, ImportModal, RunnerModal, SettingsModal } from './components/modals/Modals'
+import { NewCollectionModal, ImportModal, RunnerModal, SettingsModal, CodeGenModal, MockManagerModal, PluginManagerModal } from './components/modals/Modals'
 import { Notification }   from './components/shared/Notification'
 import styles from './App.module.css'
 
@@ -133,6 +133,9 @@ export default function App() {
       {modal === 'import'        && <ImportModal />}
       {modal === 'runner'        && <RunnerModal />}
       {modal === 'settings'      && <SettingsModal />}
+      {modal === 'codegen'       && <CodeGenModal />}
+      {modal === 'mocks'         && <MockManagerModal />}
+      {modal === 'plugins'       && <PluginManagerModal />}
 
       <Notification />
     </div>

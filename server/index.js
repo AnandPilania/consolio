@@ -12,6 +12,12 @@ import { proxyRoutes } from './routes/proxy.js';
 import { collectionRoutes } from './routes/collections.js';
 import { environmentRoutes, historyRoutes, configRoutes } from './routes/environments.js';
 import { versionRoutes, getLatestVersion } from './routes/version.js';
+import { mockRoutes } from './routes/mocks.js';
+import { pluginRoutes } from './routes/plugins.js';
+import { handleWsProxyConnection, handleWsProxyMessage } from './wsProxy.js';
+import { handleSseProxyConnection, handleSseProxyMessage } from './sseProxy.js';
+import { handleSocketIoProxyConnection, handleSocketIoProxyMessage } from './socketioProxy.js';
+import { handleGrpcProxyConnection, handleGrpcProxyMessage } from './grpcProxy.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
@@ -29,6 +35,14 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
         bodyLimit: 50 * 1024 * 1024 // 50MB
     });
 
+    // The UI's apiFetch() helper always sends Content-Type: application/json, even for
+    // body-less calls (e.g. POST /api/mocks/:id/start) — Fastify's default JSON parser
+    // rejects an empty body under that content-type, so treat empty as {} instead of 400ing.
+    fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+        if (!body) return done(null, undefined);
+        try { done(null, JSON.parse(body)); } catch (err) { done(err); }
+    });
+
     await fastify.register(cors, {
         origin: (origin, cb) => cb(null, true),
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
@@ -40,6 +54,35 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
     wss.on('connection', (ws, req) => {
         const type = new URL(req.url, 'http://localhost').searchParams.get('type');
         ws.consolioType = type;
+
+        if (type?.startsWith('ws-proxy:')) {
+            const tabId = type.slice('ws-proxy:'.length);
+            handleWsProxyConnection(ws, wss, tabId);
+            ws.on('message', (data) => handleWsProxyMessage(ws, wss, tabId, data.toString()));
+            return;
+        }
+
+        if (type?.startsWith('sse-proxy:')) {
+            const tabId = type.slice('sse-proxy:'.length);
+            handleSseProxyConnection(ws, wss, tabId);
+            ws.on('message', (data) => handleSseProxyMessage(ws, wss, tabId, data.toString()));
+            return;
+        }
+
+        if (type?.startsWith('sio-proxy:')) {
+            const tabId = type.slice('sio-proxy:'.length);
+            handleSocketIoProxyConnection(ws, wss, tabId);
+            ws.on('message', (data) => handleSocketIoProxyMessage(ws, wss, tabId, data.toString()));
+            return;
+        }
+
+        if (type?.startsWith('grpc-proxy:')) {
+            const tabId = type.slice('grpc-proxy:'.length);
+            handleGrpcProxyConnection(ws, wss, tabId);
+            ws.on('message', (data) => handleGrpcProxyMessage(ws, wss, tabId, data.toString()));
+            return;
+        }
+
         ws.on('message', (data) => {
             if (type === 'interceptor') {
                 wss.clients.forEach(client => {
@@ -83,6 +126,8 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
     await fastify.register(historyRoutes, { storage });
     await fastify.register(configRoutes, { storage });
     await fastify.register(versionRoutes);
+    await fastify.register(mockRoutes, { storage });
+    await fastify.register(pluginRoutes, { storage });
 
     fastify.post('/api/interceptor/capture', async (req) => {
         const entry = req.body;

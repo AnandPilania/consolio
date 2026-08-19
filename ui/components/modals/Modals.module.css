@@ -281,6 +281,11 @@
     color: var(--accent);
 }
 
+.rs_skipped {
+    background: var(--bg-overlay);
+    color: var(--tx-faint);
+}
+
 .runnerName {
     flex: 1;
     font-size: 12px;
@@ -514,4 +519,136 @@
     background: var(--bg-overlay);
     padding: 1px 5px;
     border-radius: 3px;
+}
+
+/* ── Mock servers ─────────────────────────────────────────────────────────── */
+.mockLayout {
+    display: flex;
+    gap: 14px;
+    min-height: 360px;
+}
+
+.mockList {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mockRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--r-sm);
+    background: var(--bg-raised);
+    border: 1px solid var(--bd-faint);
+    cursor: pointer;
+}
+
+.mockRowActive {
+    border-color: var(--accent);
+}
+
+.mockDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.mockRunning {
+    background: var(--ok);
+    box-shadow: 0 0 0 3px var(--ok-dim);
+}
+
+.mockStopped {
+    background: var(--tx-faint);
+}
+
+.mockInfo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mockName {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mockMeta {
+    font-size: 10px;
+    color: var(--tx-faint);
+    font-family: var(--font-mono);
+}
+
+.mockNewForm {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border-radius: var(--r-sm);
+    border: 1px dashed var(--bd-subtle);
+}
+
+.mockRoutes {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.mockRouteCard {
+    border: 1px solid var(--bd-faint);
+    border-radius: var(--r-md);
+    background: var(--bg-raised);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mockRouteHeader {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mockPathInput {
+    flex: 1;
+}
+
+.mockStatusInput {
+    width: 70px;
+    flex-shrink: 0;
+}
+
+.mockBodyArea {
+    background: var(--bg-base);
+    border: 1px solid var(--bd-subtle);
+    border-radius: var(--r-sm);
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--tx-base);
+    min-height: 70px;
+    resize: vertical;
+}
+
+.mockBodyArea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.mockRoutesFooter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }

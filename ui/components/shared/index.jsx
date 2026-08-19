@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cx } from '../../utils'
 import styles from './Shared.module.css'
 
@@ -125,8 +126,8 @@ export function Input({ value, onChange, placeholder, type = 'text', className }
   return <input type={type} className={cx(styles.formInput, className)} value={value} onChange={onChange} placeholder={placeholder} />
 }
 
-export function Select({ value, onChange, children, className }) {
-  return <select className={cx(styles.formSelect, className)} value={value} onChange={onChange}>{children}</select>
+export function Select({ value, onChange, children, className, style }) {
+  return <select className={cx(styles.formSelect, className)} value={value} onChange={onChange} style={style}>{children}</select>
 }
 
 /* ── Empty state ──────────────────────────────────────────────────────────── */
@@ -136,6 +137,95 @@ export function Empty({ icon, text, sub }) {
       {icon && <span className={styles.emptyIcon}>{icon}</span>}
       {text && <p className={styles.emptyText}>{text}</p>}
       {sub  && <p className={styles.emptySub}>{sub}</p>}
+    </div>
+  )
+}
+
+/* ── Message log ──────────────────────────────────────────────────────────────
+   Generic timestamped frame/event list with a connect/disconnect indicator —
+   shared by the WebSocket, SSE, Socket.io and gRPC-stream tabs.
+   frames: [{ id, direction: 'out'|'in'|'system', timestamp, data }]          */
+/* ── Collapsible JSON tree ────────────────────────────────────────────────────
+   Used by the response Body tab and by the GraphQL schema panel.             */
+export function JsonTree({ value }) {
+  return <div className={styles.jsonTree}><JsonNode label={null} value={value} depth={0} /></div>
+}
+
+function JsonNode({ label, isIndex, value, depth }) {
+  const [open, setOpen] = useState(depth < 2)
+  const isObj = value !== null && typeof value === 'object'
+
+  const labelSpan = label !== null && (
+    <>
+      <span className={isIndex ? styles.jsonIndex : 'tok-key'}>{isIndex ? label : `"${label}"`}</span>
+      <span className={styles.jsonColon}>: </span>
+    </>
+  )
+
+  if (!isObj) {
+    return (
+      <div className={styles.jsonLine} style={{ paddingLeft: depth * 14 }}>
+        {labelSpan}
+        <JsonValue value={value} />
+      </div>
+    )
+  }
+
+  const isArray = Array.isArray(value)
+  const entries = isArray ? value.map((v, i) => [i, v]) : Object.entries(value)
+  const [open_, close_] = isArray ? ['[', ']'] : ['{', '}']
+
+  return (
+    <div>
+      <div className={styles.jsonLine} style={{ paddingLeft: depth * 14, cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+        <Icon name="chevRight" size={9} className={cx(styles.jsonArrow, open && styles.jsonArrowOpen)} />
+        {labelSpan}
+        <span className={styles.jsonBracket}>{open_}</span>
+        {!open && <span className={styles.jsonCollapsedHint}>{entries.length} {isArray ? 'items' : 'keys'}</span>}
+        {!open && <span className={styles.jsonBracket}>{close_}</span>}
+      </div>
+      {open && (
+        <>
+          {entries.map(([k, v]) => (
+            <JsonNode key={k} label={k} isIndex={isArray} value={v} depth={depth + 1} />
+          ))}
+          <div className={styles.jsonLine} style={{ paddingLeft: depth * 14 }}>
+            <span className={styles.jsonBracket}>{close_}</span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function JsonValue({ value }) {
+  if (value === null) return <span className="tok-null">null</span>
+  if (typeof value === 'boolean') return <span className="tok-bool">{String(value)}</span>
+  if (typeof value === 'number') return <span className="tok-num">{value}</span>
+  return <span className="tok-str">"{String(value)}"</span>
+}
+
+export function MessageLogView({ frames = [], connected, onClear, emptyText = 'No messages yet' }) {
+  return (
+    <div className={styles.msgLog}>
+      <div className={styles.msgLogHeader}>
+        <span className={cx(styles.msgLogDot, connected ? styles.msgLogConnected : styles.msgLogDisconnected)} />
+        <span className={styles.msgLogStatus}>{connected ? 'Connected' : 'Disconnected'}</span>
+        <span style={{ flex: 1 }} />
+        {onClear && <IconBtn name="trash" size={11} title="Clear log" onClick={onClear} />}
+      </div>
+      <div className={styles.msgLogList}>
+        {frames.length === 0
+          ? <Empty text={emptyText} />
+          : frames.map(f => (
+            <div key={f.id} className={cx(styles.msgLogRow, styles[`msgLog_${f.direction}`])}>
+              <span className={styles.msgLogArrow}>{f.direction === 'out' ? '→' : f.direction === 'in' ? '←' : '·'}</span>
+              <span className={styles.msgLogTime}>{new Date(f.timestamp).toLocaleTimeString()}</span>
+              <pre className={styles.msgLogData}>{typeof f.data === 'string' ? f.data : JSON.stringify(f.data)}</pre>
+            </div>
+          ))
+        }
+      </div>
     </div>
   )
 }

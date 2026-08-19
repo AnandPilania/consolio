@@ -1,0 +1,8 @@
+{
+    "name": "consolio-plugin-idempotency-key",
+    "version": "1.0.0",
+    "description": "Adds a unique Idempotency-Key header to POST/PUT/PATCH/DELETE requests, so retrying a failed send during manual testing can't double-charge or double-create against APIs that honor it (Stripe-style).",
+    "main": "index.js",
+    "type": "commonjs",
+    "private": true
+}

@@ -17,13 +17,13 @@ export class consolioStorage {
     }
 
     _ensureDirs() {
-        ['collections', 'environments', 'history'].forEach(d => {
+        ['collections', 'environments', 'history', 'mocks'].forEach(d => {
             mkdirSync(join(this.consolioDir, d), { recursive: true });
         });
         if (!existsSync(join(this.consolioDir, 'config.json'))) {
             writeFileSync(join(this.consolioDir, 'config.json'), JSON.stringify({
                 name: this.isProjectMode ? 'Project' : 'Global Workspace',
-                version: '0.3.5',
+                version: '0.3.6',
                 created: new Date().toISOString(),
                 settings: { defaultEnvironment: null, timeout: 30000, followRedirects: true, sslVerify: true, previewLiveRender: false }
             }, null, 2));
@@ -81,5 +81,24 @@ export class consolioStorage {
     clearHistory() {
         const d = join(this.consolioDir, 'history');
         readdirSync(d).forEach(f => unlinkSync(join(d, f)));
+    }
+
+    listMocks() {
+        const dir = join(this.consolioDir, 'mocks');
+        return readdirSync(dir).filter(f => f.endsWith('.json'))
+            .map(f => { const d = JSON.parse(readFileSync(join(dir, f), 'utf8')); return { ...d, routes: d.routes || [] }; });
+    }
+    getMock(id) {
+        const file = join(this.consolioDir, 'mocks', `${id}.json`);
+        if (!existsSync(file)) return null;
+        return JSON.parse(readFileSync(file, 'utf8'));
+    }
+    saveMock(m) {
+        writeFileSync(join(this.consolioDir, 'mocks', `${m.id}.json`), JSON.stringify(m, null, 2));
+        return m;
+    }
+    deleteMock(id) {
+        const f = join(this.consolioDir, 'mocks', `${id}.json`);
+        if (existsSync(f)) unlinkSync(f);
     }
 }

@@ -1,8 +1,11 @@
-import { useStore } from '../../store'
-import { Icon, IconBtn, KVTable, FormGroup, Input, Select, Empty } from '../shared'
+import { useState } from 'react'
+import { useStore, apiFetch } from '../../store'
+import { Icon, IconBtn, KVTable, FormGroup, Input, Select, Empty, Btn, JsonTree } from '../shared'
 import { uid, buildCurl } from '../../utils'
 import styles from './RequestPane.module.css'
 import sharedStyles from '../shared/Shared.module.css'
+
+const GRAPHQL_INTROSPECTION_QUERY = `query IntrospectionQuery { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }`
 
 export function RequestPane() {
   const tabs         = useStore(s => s.tabs)
@@ -10,13 +13,11 @@ export function RequestPane() {
   const tab          = tabs.find(t => t.id === activeTabId) || tabs[0]
   const environments = useStore(s => s.environments)
   const activeEnvId  = useStore(s => s.activeEnvId)
-  const envVars      = (() => {
-    const env = environments.find(e => e.id === activeEnvId) || environments[0] || null
-    if (!env) return {}
-    return Object.fromEntries(
-      (env.variables || []).filter(v => v.enabled).map(v => [v.key, v.value])
-    )
-  })()
+  const activeEnv    = environments.find(e => e.id === activeEnvId) || environments[0] || null
+  const envVars      = Object.fromEntries(
+    (activeEnv?.variables || []).filter(v => v.enabled).map(v => [v.key, v.value])
+  )
+  const secretKeys   = (activeEnv?.variables || []).filter(v => v.secret).map(v => v.key)
   const ut           = useStore(s => s.updateActiveTab)
   const sendRequest  = useStore(s => s.sendRequest)
   const saveRequest  = useStore(s => s.saveRequest)
@@ -24,6 +25,20 @@ export function RequestPane() {
   const closeTab     = useStore(s => s.closeTab)
   const newTab       = useStore(s => s.newTab)
   const showNotif    = useStore(s => s.showNotif)
+  const connectWs    = useStore(s => s.connectWs)
+  const disconnectWs = useStore(s => s.disconnectWs)
+  const connectSse    = useStore(s => s.connectSse)
+  const disconnectSse = useStore(s => s.disconnectSse)
+  const connectSio    = useStore(s => s.connectSio)
+  const disconnectSio = useStore(s => s.disconnectSio)
+  const loadGrpcProto = useStore(s => s.loadGrpcProto)
+  const callGrpc      = useStore(s => s.callGrpc)
+  const disconnectGrpc = useStore(s => s.disconnectGrpc)
+
+  const isWs   = tab.wsMode
+  const isSse  = tab.sseMode
+  const isSio  = tab.sioMode
+  const isGrpc = tab.grpcMode
 
   const METHOD_COLORS = {
     GET: 'var(--m-GET)', POST: 'var(--m-POST)', PUT: 'var(--m-PUT)',
@@ -31,12 +46,26 @@ export function RequestPane() {
     HEAD: 'var(--tx-muted)', OPTIONS: 'var(--tx-muted)',
   }
 
+  const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+  const currentReqType = isWs ? 'WS' : isSse ? 'SSE' : isSio ? 'SIO' : isGrpc ? 'GRPC' : tab.method
+  const selectReqType = value => {
+    if (isWs && tab.wsConnected) disconnectWs()
+    if (isSse && tab.sseConnected) disconnectSse()
+    if (isSio && tab.sioConnected) disconnectSio()
+    if (isGrpc && tab.grpcConnected) disconnectGrpc()
+    if (['WS', 'SSE', 'SIO', 'GRPC'].includes(value)) {
+      ut({ wsMode: value === 'WS', sseMode: value === 'SSE', sioMode: value === 'SIO', grpcMode: value === 'GRPC' })
+    } else {
+      ut({ method: value, wsMode: false, sseMode: false, sioMode: false, grpcMode: false })
+    }
+  }
+
   const copyCurl = () => {
     const curl = buildCurl({
       method: tab.method, url: tab.url,
       headers: tab.headers, params: tab.params,
       body: tab.body, auth: tab.auth,
-      environment: envVars,
+      environment: envVars, secretKeys,
     })
     navigator.clipboard.writeText(curl)
     showNotif('cURL copied', 'success')
@@ -90,39 +119,82 @@ export function RequestPane() {
       <div className={styles.urlBar}>
         <select
           className={styles.methodSelect}
-          value={tab.method}
-          onChange={e => ut({ method: e.target.value })}
-          style={{ color: METHOD_COLORS[tab.method] || 'var(--tx-base)' }}
+          value={currentReqType}
+          onChange={e => selectReqType(e.target.value)}
+          style={{ color: (isWs || isSse || isSio || isGrpc) ? 'var(--accent)' : (METHOD_COLORS[tab.method] || 'var(--tx-base)') }}
         >
-          {['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'].map(m => (
-            <option key={m} value={m}>{m}</option>
-          ))}
+          <optgroup label="HTTP">
+            {HTTP_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+          </optgroup>
+          <optgroup label="Protocols">
+            <option value="WS">WebSocket</option>
+            <option value="SSE">SSE</option>
+            <option value="SIO">Socket.IO</option>
+            <option value="GRPC">gRPC</option>
+          </optgroup>
         </select>
 
         <input
           className={styles.urlInput}
-          placeholder="https://api.example.com/endpoint  •  use {{VAR}} for env vars"
+          placeholder="https://api.example.com/endpoint  •  use {{VAR}} for env vars, or ws(s):// for WebSocket"
           value={tab.url}
           onChange={e => ut({ url: e.target.value })}
-          onKeyDown={e => e.key === 'Enter' && sendRequest()}
+          onKeyDown={e => e.key === 'Enter' && !isWs && !isSse && !isSio && !isGrpc && sendRequest()}
         />
 
-        <button className={styles.curlBtn} onClick={copyCurl} title="Copy as cURL">
-          <Icon name="terminal" size={13} />
-        </button>
+        {!isWs && !isSse && !isSio && !isGrpc && (
+          <>
+            <button className={styles.curlBtn} onClick={copyCurl} title="Copy as cURL">
+              <Icon name="terminal" size={13} />
+            </button>
+            <button className={styles.curlBtn} onClick={() => useStore.setState({ modal: 'codegen' })} title="Generate code snippet">
+              <Icon name="code" size={13} />
+            </button>
+          </>
+        )}
         <button className={styles.saveBtn} onClick={saveRequest} title="Save request">
           <Icon name="save" size={13} />
         </button>
-        <button
-          className={`${styles.sendBtn} ${tab.loading ? styles.sending : ''}`}
-          onClick={sendRequest}
-          disabled={tab.loading}
-        >
-          {tab.loading
-            ? <><span className={styles.spinner} /> Sending…</>
-            : <><Icon name="send" size={13} /> Send</>
-          }
-        </button>
+        {isWs ? (
+          <button
+            className={`${styles.sendBtn} ${tab.wsConnected ? styles.sending : ''}`}
+            onClick={() => tab.wsConnected ? disconnectWs() : connectWs(tab.url)}
+          >
+            {tab.wsConnected ? <><Icon name="x" size={13} /> Disconnect</> : <><Icon name="zap" size={13} /> Connect</>}
+          </button>
+        ) : isSse ? (
+          <button
+            className={`${styles.sendBtn} ${tab.sseConnected ? styles.sending : ''}`}
+            onClick={() => tab.sseConnected ? disconnectSse() : connectSse(tab.url)}
+          >
+            {tab.sseConnected ? <><Icon name="x" size={13} /> Disconnect</> : <><Icon name="zap" size={13} /> Connect</>}
+          </button>
+        ) : isSio ? (
+          <button
+            className={`${styles.sendBtn} ${tab.sioConnected ? styles.sending : ''}`}
+            onClick={() => tab.sioConnected ? disconnectSio() : connectSio(tab.url)}
+          >
+            {tab.sioConnected ? <><Icon name="x" size={13} /> Disconnect</> : <><Icon name="zap" size={13} /> Connect</>}
+          </button>
+        ) : isGrpc ? (
+          <button
+            className={`${styles.sendBtn} ${tab.grpcConnected ? styles.sending : ''}`}
+            onClick={() => tab.grpcConnected ? disconnectGrpc() : callGrpc()}
+          >
+            {tab.grpcConnected ? <><Icon name="x" size={13} /> Cancel</> : <><Icon name="zap" size={13} /> Call</>}
+          </button>
+        ) : (
+          <button
+            className={`${styles.sendBtn} ${tab.loading ? styles.sending : ''}`}
+            onClick={sendRequest}
+            disabled={tab.loading}
+          >
+            {tab.loading
+              ? <><span className={styles.spinner} /> Sending…</>
+              : <><Icon name="send" size={13} /> Send</>
+            }
+          </button>
+        )}
       </div>
 
       {/* ── Request sub-tabs ────────────────────────────────────────────── */}
@@ -160,23 +232,36 @@ export function RequestPane() {
 
       {/* ── Panel content ───────────────────────────────────────────────── */}
       <div className={styles.panel}>
-        {tab.reqTab === 'params'  && <KVTable rows={tab.params}  onChange={v => ut({ params: v })}  placeholder={['Parameter', 'Value']} />}
-        {tab.reqTab === 'headers' && <KVTable rows={tab.headers} onChange={v => ut({ headers: v })} placeholder={['Header',    'Value']} />}
-        {tab.reqTab === 'body'    && <BodyPanel    body={tab.body}        onChange={v => ut({ body: v })} />}
-        {tab.reqTab === 'auth'    && <AuthPanel    auth={tab.auth}        onChange={v => ut({ auth: v })} />}
-        {tab.reqTab === 'pre'     && <ScriptPanel  code={tab.preScript}   onChange={v => ut({ preScript: v })}   type="pre"  logs={tab.preLogs} />}
-        {tab.reqTab === 'post'    && <ScriptPanel  code={tab.postScript}  onChange={v => ut({ postScript: v })}  type="post" logs={tab.postLogs} />}
-        {tab.reqTab === 'tests'   && <TestsPanel   tests={tab.tests}      onChange={v => ut({ tests: v })}       results={tab.testResults} />}
+        {isGrpc && (
+          <GrpcPanel tab={tab} ut={ut} loadGrpcProto={loadGrpcProto} />
+        )}
+        {!isGrpc && tab.reqTab === 'params'  && <KVTable rows={tab.params}  onChange={v => ut({ params: v })}  placeholder={['Parameter', 'Value']} />}
+        {!isGrpc && tab.reqTab === 'headers' && <KVTable rows={tab.headers} onChange={v => ut({ headers: v })} placeholder={['Header',    'Value']} />}
+        {!isGrpc && tab.reqTab === 'body'    && (
+          <BodyPanel
+            body={tab.body} onChange={v => ut({ body: v })}
+            method={tab.method} setMethod={m => ut({ method: m })}
+            url={tab.url} headers={tab.headers} auth={tab.auth} environment={envVars}
+          />
+        )}
+        {!isGrpc && tab.reqTab === 'auth'    && <AuthPanel    auth={tab.auth}        onChange={v => ut({ auth: v })} />}
+        {!isGrpc && tab.reqTab === 'pre'     && <ScriptPanel  code={tab.preScript}   onChange={v => ut({ preScript: v })}   type="pre"  logs={tab.preLogs} />}
+        {!isGrpc && tab.reqTab === 'post'    && <ScriptPanel  code={tab.postScript}  onChange={v => ut({ postScript: v })}  type="post" logs={tab.postLogs} />}
+        {!isGrpc && tab.reqTab === 'tests'   && <TestsPanel   tests={tab.tests}      onChange={v => ut({ tests: v })}       results={tab.testResults} />}
       </div>
     </div>
   )
 }
 
 /* ── Body panel ───────────────────────────────────────────────────────────── */
-function BodyPanel({ body, onChange }) {
+function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, environment }) {
   const set = (k, v) => onChange({ ...body, [k]: v })
-  const TYPES = ['none', 'json', 'text', 'form', 'multipart', 'raw']
-  const LABELS = { multipart: 'Form Data' }
+  const TYPES = ['none', 'json', 'text', 'form', 'multipart', 'raw', 'graphql']
+  const LABELS = { multipart: 'Form Data', graphql: 'GraphQL' }
+  const selectType = t => {
+    onChange({ ...body, type: t })
+    if (t === 'graphql' && method !== 'POST') setMethod('POST')
+  }
   return (
     <div className={styles.bodyWrap}>
       <div className={styles.bodyTypeBar}>
@@ -184,7 +269,7 @@ function BodyPanel({ body, onChange }) {
           <button
             key={t}
             className={`${styles.bodyType} ${body.type === t ? styles.bodyTypeActive : ''}`}
-            onClick={() => set('type', t)}
+            onClick={() => selectType(t)}
           >
             {LABELS[t] || (t.charAt(0).toUpperCase() + t.slice(1))}
           </button>
@@ -205,6 +290,109 @@ function BodyPanel({ body, onChange }) {
           onChange={e => set('content', e.target.value)}
         />
       )}
+      {body.type === 'graphql' && (
+        <GraphQLPanel body={body} onChange={onChange} url={url} headers={headers} auth={auth} environment={environment} />
+      )}
+    </div>
+  )
+}
+
+/* ── GraphQL body editor (query + variables + schema introspection) ─────────── */
+function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
+  const set = (k, v) => onChange({ ...body, [k]: v })
+  const [loading, setLoading] = useState(false)
+  const [schema,  setSchema]  = useState(null)
+  const [error,   setError]   = useState('')
+
+  const fetchSchema = async () => {
+    setLoading(true); setError(''); setSchema(null)
+    try {
+      const res = await apiFetch('/api/execute', {
+        method: 'POST',
+        body: {
+          method: 'POST', url, headers, auth, environment, saveToHistory: false,
+          body: { type: 'json', content: JSON.stringify({ query: GRAPHQL_INTROSPECTION_QUERY }) },
+        },
+      })
+      if (res.error) throw new Error(res.error)
+      const parsed = JSON.parse(res.body)
+      if (parsed.errors?.length) throw new Error(parsed.errors[0].message || 'Introspection failed')
+      if (!parsed.data?.__schema) throw new Error('Server did not return a schema')
+      setSchema(parsed.data.__schema)
+    } catch (e) { setError(e.message) }
+    setLoading(false)
+  }
+
+  return (
+    <div className={styles.graphqlWrap}>
+      <div className={styles.graphqlLabel}>Query</div>
+      <textarea
+        className={styles.codeArea}
+        placeholder={'query {\n  \n}'}
+        value={body.query || ''}
+        onChange={e => set('query', e.target.value)}
+      />
+      <div className={styles.graphqlLabel}>Variables (JSON)</div>
+      <textarea
+        className={styles.codeArea}
+        style={{ minHeight: 70 }}
+        placeholder="{}"
+        value={body.variables || ''}
+        onChange={e => set('variables', e.target.value)}
+      />
+      <div className={styles.graphqlSchemaBar}>
+        <Btn variant="ghost" size="sm" onClick={fetchSchema} disabled={loading || !url}>
+          {loading ? 'Loading schema…' : 'Fetch Schema'}
+        </Btn>
+        {error && <span className={styles.graphqlSchemaError}>{error}</span>}
+      </div>
+      {schema && <div className={styles.graphqlSchemaTree}><JsonTree value={schema} /></div>}
+    </div>
+  )
+}
+
+/* ── gRPC panel: paste a .proto, pick a method, fill the request JSON ────────
+   Address goes in the URL bar (host:port). Only unary and server-streaming
+   methods are supported — client-streaming/bidi is rejected server-side.    */
+function GrpcPanel({ tab, ut, loadGrpcProto }) {
+  return (
+    <div className={styles.graphqlWrap}>
+      <div className={styles.graphqlLabel}>.proto file</div>
+      <textarea
+        className={styles.codeArea}
+        style={{ minHeight: 100 }}
+        placeholder={'syntax = "proto3";\npackage demo;\n\nservice Greeter {\n  rpc SayHello (HelloRequest) returns (HelloReply) {}\n}\n\nmessage HelloRequest { string name = 1; }\nmessage HelloReply { string message = 1; }'}
+        value={tab.grpcProtoText}
+        onChange={e => ut({ grpcProtoText: e.target.value })}
+      />
+      <div className={styles.graphqlSchemaBar}>
+        <Btn variant="ghost" size="sm" onClick={loadGrpcProto} disabled={!tab.grpcProtoText?.trim()}>
+          Load Proto
+        </Btn>
+        {tab.grpcMethods?.length > 0 && (
+          <select
+            className={sharedStyles.formSelect}
+            style={{ flex: 1 }}
+            value={tab.grpcMethodPath}
+            onChange={e => ut({ grpcMethodPath: e.target.value })}
+          >
+            <option value="">Select a method…</option>
+            {tab.grpcMethods.map(m => (
+              <option key={m.path} value={m.path}>
+                {m.path}{m.responseStream ? ' (server-streaming)' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div className={styles.graphqlLabel}>Request (JSON)</div>
+      <textarea
+        className={styles.codeArea}
+        style={{ minHeight: 90 }}
+        placeholder={'{\n  "name": "World"\n}'}
+        value={tab.grpcRequestJson}
+        onChange={e => ut({ grpcRequestJson: e.target.value })}
+      />
     </div>
   )
 }
@@ -388,17 +576,21 @@ function TestsPanel({ tests, onChange, results }) {
               >
                 <option value="status">Status =</option>
                 <option value="status_lt">Status &lt;</option>
+                <option value="status_in">Status in list</option>
                 <option value="has_header">Has header</option>
+                <option value="header_equals">Header =</option>
                 <option value="body_contains">Body contains</option>
+                <option value="body_not_contains">Body doesn't contain</option>
                 <option value="body_json_path">JSON path =</option>
                 <option value="response_time">Response ≤ ms</option>
+                <option value="response_time_gt">Response &gt; ms</option>
                 <option value="body_not_empty">Body not empty</option>
               </select>
               {t.type === 'body_json_path' && (
                 <input
                   className={styles.assertInput}
                   style={{ width: 100 }}
-                  placeholder="e.g. data.id"
+                  placeholder="e.g. data[0].id"
                   value={t.path || ''}
                   onChange={e => upd(i, 'path', e.target.value)}
                 />
@@ -406,7 +598,13 @@ function TestsPanel({ tests, onChange, results }) {
               {t.type !== 'body_not_empty' && (
                 <input
                   className={styles.assertInput}
-                  placeholder={t.type === 'status' ? '200' : t.type === 'response_time' ? '500' : 'value…'}
+                  placeholder={
+                    t.type === 'status' ? '200' :
+                    t.type === 'status_in' ? '200,201,204' :
+                    t.type === 'response_time' || t.type === 'response_time_gt' ? '500' :
+                    t.type === 'header_equals' ? 'content-type=application/json' :
+                    'value…'
+                  }
                   value={t.value || ''}
                   onChange={e => upd(i, 'value', e.target.value)}
                 />

@@ -1,0 +1,8 @@
+{
+    "name": "consolio-plugin-dynamic-vars",
+    "version": "1.0.0",
+    "description": "Postman-style dynamic variables — {{% uuid %}}, {{% timestamp %}}, {{% randomEmail %}}, etc. — for generating test data on the fly.",
+    "main": "index.js",
+    "type": "commonjs",
+    "private": true
+}

@@ -1,0 +1,8 @@
+{
+    "name": "consolio-plugin-correlation-id",
+    "version": "1.0.0",
+    "description": "Adds a unique X-Request-Id header to every outgoing request, so you can grep for it in the target server's logs.",
+    "main": "index.js",
+    "type": "commonjs",
+    "private": true
+}

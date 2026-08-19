@@ -47,4 +47,19 @@ program
         await initProject({ name: options.name });
     });
 
+program
+    .command('run <collection>')
+    .description('Run a collection headlessly (id or name) — like Newman, no browser needed')
+    .option('-e, --env <name>', 'Environment id or name to use')
+    .option('-r, --reporter <type>', 'Reporter: cli | json | junit', 'cli')
+    .option('-c, --concurrency <n>', 'Requests to run in parallel', '1')
+    .option('-d, --delay <ms>', 'Delay between batches, in ms', '0')
+    .option('--bail', 'Stop on the first failing request')
+    .option('--project <path>', 'Path to project directory', process.cwd())
+    .action(async (collection, options) => {
+        const { runCollectionCli } = await import('../server/runner-cli.js');
+        const exitCode = await runCollectionCli(collection, options);
+        process.exit(exitCode);
+    });
+
 program.parse();

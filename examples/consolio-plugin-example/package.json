@@ -1,0 +1,8 @@
+{
+    "name": "consolio-plugin-example",
+    "version": "1.0.0",
+    "description": "Reference consolio plugin — demonstrates requestHooks, responseHooks, and templateTags.",
+    "main": "index.js",
+    "type": "commonjs",
+    "private": true
+}

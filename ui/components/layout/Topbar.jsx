@@ -43,6 +43,8 @@ export function Topbar() {
         <Icon name="chevDown" size={11} style={{ color: 'var(--tx-faint)', pointerEvents: 'none' }} />
       </div>
 
+      <IconBtn name="globe"    title="Mock servers"     onClick={() => useStore.setState({ modal: 'mocks' })} />
+      <IconBtn name="code"     title="Plugins"          onClick={() => useStore.setState({ modal: 'plugins' })} />
       <IconBtn name="layout"   title="Customise layout" onClick={() => useStore.setState({ showCustomise: true })} />
       <IconBtn name="settings" title="Settings"         onClick={() => useStore.setState({ modal: 'settings', modalData: {} })} />
     </header>

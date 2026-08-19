@@ -225,10 +225,37 @@
     position: absolute;
     inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     background: var(--bg-base);
     padding: 24px;
+}
+
+.previewSlowNote {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 11px;
+    color: var(--tx-faint);
+    background: var(--bg-overlay);
+    border: 1px solid var(--bd-subtle);
+    border-radius: var(--r-md);
+    padding: 4px 10px;
+}
+
+.hintRow {
+    flex-shrink: 0;
+    font-size: 11.5px;
+    color: var(--tx-faint);
+    text-align: center;
+    padding: 8px 24px 14px;
+}
+
+.hintLink {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .previewImageWrap {
@@ -329,4 +356,99 @@
     font-family: var(--font-mono);
     font-size: 10.5px;
     color: var(--tx-faint);
+}
+
+/* ── JSON tree view ───────────────────────────────────────────────────────── */
+.bodyViewWrap {
+    height: 100%;
+}
+
+.bodyModeToggle {
+    display: flex;
+    gap: 2px;
+    padding: 8px 14px 0;
+}
+
+.bodyModeBtn {
+    padding: 2px 9px;
+    border-radius: 99px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--tx-faint);
+    border: 1px solid var(--bd-subtle);
+    transition: all .12s;
+}
+
+.bodyModeBtn:hover {
+    color: var(--tx-muted);
+}
+
+.bodyModeActive {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: transparent;
+}
+
+/* ── Diff view ────────────────────────────────────────────────────────────── */
+.diffWrap {
+    padding: 8px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.diffLine {
+    display: flex;
+    gap: 8px;
+    padding: 0 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.diffMarker {
+    flex-shrink: 0;
+    color: var(--tx-faint);
+    width: 10px;
+}
+
+.diffAdd {
+    background: var(--ok-dim);
+}
+
+.diffAdd .diffMarker {
+    color: var(--ok);
+}
+
+.diffDel {
+    background: var(--err-dim);
+}
+
+.diffDel .diffMarker {
+    color: var(--err);
+}
+
+/* ── WebSocket compose bar ────────────────────────────────────────────────── */
+.wsComposeBar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--bd-faint);
+    flex-shrink: 0;
+}
+
+.wsComposeInput {
+    flex: 1;
+    background: var(--bg-raised);
+    border: 1px solid var(--bd-subtle);
+    border-radius: var(--r-md);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--tx-base);
+}
+
+.wsComposeInput:focus {
+    outline: none;
+    border-color: var(--accent);
 }
