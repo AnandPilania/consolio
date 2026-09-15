@@ -115,6 +115,20 @@
     border-radius: 99px;
 }
 
+.gradeChip {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 99px;
+    cursor: pointer;
+    line-height: 1.4;
+}
+.gradeChip[data-grade="A"] { color: var(--ok);   background: var(--ok-dim); }
+.gradeChip[data-grade="B"] { color: var(--ok);   background: var(--ok-dim); }
+.gradeChip[data-grade="C"] { color: var(--warn); background: rgba(251, 191, 36, 0.12); }
+.gradeChip[data-grade="D"] { color: var(--warn); background: rgba(251, 191, 36, 0.12); }
+.gradeChip[data-grade="F"] { color: var(--err);  background: var(--err-dim); }
+
 .danger:hover {
     color: var(--err) !important;
 }

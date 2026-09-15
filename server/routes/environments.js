@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { buildAnalytics } from '../analytics.js';
 
 export async function environmentRoutes(fastify, { storage }) {
     fastify.get('/api/environments', async () => storage.listEnvironments());
@@ -6,7 +7,7 @@ export async function environmentRoutes(fastify, { storage }) {
     fastify.post('/api/environments', async (req, reply) => {
         const { name, color = '#6366f1' } = req.body;
         if (!name) return reply.status(400).send({ error: 'Name is required' });
-        const env = { id: `env_${randomUUID().slice(0,8)}`, name, color, variables: req.body.variables || [], created: new Date().toISOString() };
+        const env = { id: `env_${randomUUID().slice(0, 8)}`, name, color, variables: req.body.variables || [], created: new Date().toISOString() };
         return storage.saveEnvironment(env);
     });
 
@@ -32,6 +33,11 @@ export async function historyRoutes(fastify, { storage }) {
     fastify.delete('/api/history', async () => {
         storage.clearHistory();
         return { cleared: true };
+    });
+
+    fastify.get('/api/history/analytics', async (req) => {
+        const { collectionId } = req.query;
+        return buildAnalytics(storage.getAllHistory(), { collectionId: collectionId || null });
     });
 }
 

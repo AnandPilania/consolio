@@ -21,15 +21,13 @@ function persistEnvVars(storage, environmentId, updates) {
     storage.saveEnvironment({ ...env, variables });
 }
 
-// Core request-execution pipeline: pre-script → send → tests → post-script → persist env vars.
-// Returns { httpStatus, payload } so both the /api/execute route and the in-process CLI runner
-// (bin/consolio.js) can call this directly without going through HTTP.
 export async function executeRequest(reqBody, { storage }) {
     let {
         method = 'GET', url, headers = [], params = [], body,
         auth, timeout = 30000, followRedirects = true,
         saveToHistory = true, environment: envInput = {}, sslVerify,
-        preScript = '', postScript = '', tests = [], environmentId
+        preScript = '', postScript = '', tests = [], environmentId,
+        collectionId = null, requestId = null, requestName = null
     } = reqBody;
 
     if (!url) return { httpStatus: 400, payload: { error: 'URL is required' } };
@@ -91,9 +89,6 @@ export async function executeRequest(reqBody, { storage }) {
             fetchBody = form.toString();
             if (!headerMap['Content-Type']) headerMap['Content-Type'] = 'application/x-www-form-urlencoded';
         } else if (body.type === 'multipart' && body.fields) {
-            // multipart/form-data — supports text fields and file fields.
-            // File fields arrive as { key, type: 'file', enabled, fileName, fileType, fileData }
-            // where fileData is a base64 string (no data: prefix) sent by the UI.
             const { FormData: NodeFormData, Blob: NodeBlob } = await import('node-fetch');
             const form = new NodeFormData();
             body.fields.filter(f => f.enabled && f.key).forEach(f => {
@@ -106,7 +101,6 @@ export async function executeRequest(reqBody, { storage }) {
                 }
             });
             fetchBody = form;
-            // Do NOT set Content-Type manually — node-fetch sets the multipart boundary itself.
             delete headerMap['Content-Type'];
         } else if (body.type === 'raw' && body.content) {
             fetchBody = body.content;
@@ -127,7 +121,6 @@ export async function executeRequest(reqBody, { storage }) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeout);
 
-        // sslVerify: per-request override; falls back to the workspace config default (true unless changed in Settings).
         const shouldVerify = sslVerify !== undefined ? sslVerify : (storage.getConfig().settings?.sslVerify ?? true);
         const agent = finalUrl.startsWith('https:') ? (shouldVerify ? agents.verify : agents.noVerify) : undefined;
 
@@ -156,15 +149,11 @@ export async function executeRequest(reqBody, { storage }) {
 
         let responseBody = bodyType === 'image' ? buffer.toString('base64') : buffer.toString('utf8');
 
-        // responseHooks may transform body/headers/bodyType (e.g. decrypt a payload) before
-        // tests run and before the UI ever sees it — status/statusText/size aren't hookable,
-        // keeping "what actually came back over the wire" honest.
         ({ headers: responseHeaders, body: responseBody, bodyType } = await runResponseHooks(hooks, {
             status: response.status, statusText: response.statusText,
             headers: responseHeaders, body: responseBody, bodyType, elapsed,
         }));
 
-        // FormData instances aren't JSON-serialisable — store a lightweight summary in history instead.
         const historyBody = (body?.type === 'multipart')
             ? {
                 type: 'multipart', fields: body.fields.map(f => f.type === 'file'
@@ -176,6 +165,7 @@ export async function executeRequest(reqBody, { storage }) {
         const historyEntry = {
             id: `h_${Date.now()}_${randomUUID().slice(0, 6)}`,
             timestamp: new Date().toISOString(),
+            collectionId, requestId, requestName,
             request: { method, url: finalUrl, headers: headerMap, body: historyBody },
             response: { status: response.status, statusText: response.statusText, headers: responseHeaders, body: responseBody, bodyType, size, elapsed }
         };

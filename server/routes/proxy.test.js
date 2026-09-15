@@ -41,4 +41,29 @@ const storage = { consolioDir: process.cwd(), getConfig: () => ({ settings: {} }
     server.close();
 }
 
+{
+    let saved;
+    const historyStorage = {
+        consolioDir: process.cwd(),
+        getConfig: () => ({ settings: {} }),
+        addHistory: (entry) => { saved = entry; },
+    };
+    const server = http.createServer((req, res) => res.end('ok'));
+    await new Promise(r => server.listen(0, r));
+    const { port } = server.address();
+
+    await executeRequest({
+        method: 'GET',
+        url: `http://127.0.0.1:${port}/path`,
+        saveToHistory: true,
+        collectionId: 'col_abc', requestId: 'req_xyz', requestName: 'Get widget',
+    }, { storage: historyStorage });
+
+    assert.ok(saved, 'expected addHistory to be called');
+    assert.strictEqual(saved.collectionId, 'col_abc');
+    assert.strictEqual(saved.requestId, 'req_xyz');
+    assert.strictEqual(saved.requestName, 'Get widget');
+    server.close();
+}
+
 console.log('proxy.test.js: all checks passed');

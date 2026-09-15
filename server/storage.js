@@ -78,6 +78,11 @@ export class consolioStorage {
         return readdirSync(histDir).filter(f => f.endsWith('.json')).sort().reverse()
             .slice(0, limit).map(f => JSON.parse(readFileSync(join(histDir, f), 'utf8')));
     }
+    getAllHistory() {
+        const histDir = join(this.consolioDir, 'history');
+        return readdirSync(histDir).filter(f => f.endsWith('.json')).sort().reverse()
+            .map(f => JSON.parse(readFileSync(join(histDir, f), 'utf8')));
+    }
     clearHistory() {
         const d = join(this.consolioDir, 'history');
         readdirSync(d).forEach(f => unlinkSync(join(d, f)));

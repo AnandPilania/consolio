@@ -1,12 +1,20 @@
 import { randomUUID } from 'crypto';
+import { scoreCollection } from '../scoring.js';
+import { suggestFixes, callAnthropic } from '../ai-suggest.js';
 
 export async function collectionRoutes(fastify, { storage }) {
     fastify.get('/api/collections', async () => storage.listCollections());
 
+    fastify.get('/api/collections/:id/score', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        return scoreCollection(col);
+    });
+
     fastify.post('/api/collections', async (req, reply) => {
         const { name, description = '' } = req.body;
         if (!name) return reply.status(400).send({ error: 'Name is required' });
-        const col = { id: `col_${randomUUID().slice(0,8)}`, name, description, created: new Date().toISOString(), requests: [] };
+        const col = { id: `col_${randomUUID().slice(0, 8)}`, name, description, created: new Date().toISOString(), requests: [] };
         return storage.saveCollection(col);
     });
 
@@ -23,19 +31,20 @@ export async function collectionRoutes(fastify, { storage }) {
 
     function buildRequest(body) {
         return {
-            id: `req_${randomUUID().slice(0,8)}`,
-            name:       body.name       || 'New Request',
-            method:     body.method     || 'GET',
-            url:        body.url        || '',
-            headers:    body.headers    || [],
-            params:     body.params     || [],
-            body:       body.body       || { type: 'none', content: '' },
-            auth:       body.auth       || { type: 'none' },
-            preScript:  body.preScript  || '',
+            id: `req_${randomUUID().slice(0, 8)}`,
+            name: body.name || 'New Request',
+            description: body.description || '',
+            method: body.method || 'GET',
+            url: body.url || '',
+            headers: body.headers || [],
+            params: body.params || [],
+            body: body.body || { type: 'none', content: '' },
+            auth: body.auth || { type: 'none' },
+            preScript: body.preScript || '',
             postScript: body.postScript || '',
-            tests:      body.tests      || [],
-            folderId:   body.folderId   || null,
-            created:    new Date().toISOString()
+            tests: body.tests || [],
+            folderId: body.folderId || null,
+            created: new Date().toISOString()
         };
     }
 
@@ -48,7 +57,6 @@ export async function collectionRoutes(fastify, { storage }) {
         return request;
     });
 
-    // Bulk create — used by import so a large collection is one round-trip instead of N.
     fastify.post('/api/collections/:id/requests/bulk', async (req, reply) => {
         const col = storage.getCollection(req.params.id);
         if (!col) return reply.status(404).send({ error: 'Collection not found' });
@@ -56,6 +64,29 @@ export async function collectionRoutes(fastify, { storage }) {
         col.requests.push(...created);
         storage.saveCollection(col);
         return created;
+    });
+
+    fastify.post('/api/collections/:colId/requests/:reqId/ai-suggest', async (req, reply) => {
+        const { apiKey, model } = req.body || {};
+        if (!apiKey) return reply.status(400).send({ error: 'apiKey is required — this feature is bring-your-own-key' });
+
+        const col = storage.getCollection(req.params.colId);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        const request = (col.requests || []).find(r => r.id === req.params.reqId);
+        if (!request) return reply.status(404).send({ error: 'Request not found' });
+
+        const lastEntry = storage.getAllHistory().find(h => h.requestId === request.id);
+
+        try {
+            const suggestion = await suggestFixes(
+                request,
+                lastEntry?.response || null,
+                (prompt) => callAnthropic({ apiKey, model, prompt })
+            );
+            return suggestion;
+        } catch (e) {
+            return reply.status(502).send({ error: e.message });
+        }
     });
 
     fastify.put('/api/collections/:colId/requests/:reqId', async (req, reply) => {
@@ -76,7 +107,6 @@ export async function collectionRoutes(fastify, { storage }) {
         return { deleted: true };
     });
 
-    // order: array of request ids (reorder only) or {id, folderId} objects (reorder + move between folders)
     fastify.patch('/api/collections/:id/reorder', async (req, reply) => {
         const col = storage.getCollection(req.params.id);
         if (!col) return reply.status(404).send({ error: 'Collection not found' });
@@ -96,7 +126,7 @@ export async function collectionRoutes(fastify, { storage }) {
         const col = storage.getCollection(req.params.id);
         if (!col) return reply.status(404).send({ error: 'Collection not found' });
         if (!req.body.name) return reply.status(400).send({ error: 'Name is required' });
-        const folder = { id: `fld_${randomUUID().slice(0,8)}`, name: req.body.name, parentId: req.body.parentId || null };
+        const folder = { id: `fld_${randomUUID().slice(0, 8)}`, name: req.body.name, parentId: req.body.parentId || null };
         col.folders = [...(col.folders || []), folder];
         storage.saveCollection(col);
         return folder;
@@ -116,7 +146,6 @@ export async function collectionRoutes(fastify, { storage }) {
         const col = storage.getCollection(req.params.id);
         if (!col) return reply.status(404).send({ error: 'Collection not found' });
         const { folderId } = req.params;
-        // Un-nest anything inside the deleted folder rather than destroying it.
         col.folders = (col.folders || []).filter(f => f.id !== folderId)
             .map(f => f.parentId === folderId ? { ...f, parentId: null } : f);
         col.requests = col.requests.map(r => r.folderId === folderId ? { ...r, folderId: null } : r);

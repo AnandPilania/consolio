@@ -31,6 +31,8 @@ const PATHS = {
   refresh:   'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
   ban:       'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636',
   shield:    'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  barChart:  'M12 20V10M18 20V4M6 20v-4',
+  sparkle:   'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 3v3M20.5 4.5h-3M5 17v2M6 18H4',
 }
 
 export function Icon({ name, size = 14, className, style }) {
@@ -48,7 +50,6 @@ export function Icon({ name, size = 14, className, style }) {
   )
 }
 
-/* ── Method badge ─────────────────────────────────────────────────────────── */
 export function MethodBadge({ method, small }) {
   return (
     <span className={cx(styles.badge, styles[`m_${method}`], small && styles.badgeSm)}>
@@ -57,7 +58,6 @@ export function MethodBadge({ method, small }) {
   )
 }
 
-/* ── IconButton ───────────────────────────────────────────────────────────── */
 export function IconBtn({ name, onClick, title, className, size = 14, danger }) {
   return (
     <button
@@ -69,7 +69,6 @@ export function IconBtn({ name, onClick, title, className, size = 14, danger }) 
   )
 }
 
-/* ── Button ───────────────────────────────────────────────────────────────── */
 export function Btn({ children, variant = 'ghost', onClick, className, disabled, size }) {
   return (
     <button
@@ -81,12 +80,10 @@ export function Btn({ children, variant = 'ghost', onClick, className, disabled,
   )
 }
 
-/* ── Spinner ──────────────────────────────────────────────────────────────── */
 export function Spinner({ size = 14 }) {
   return <span className={styles.spinner} style={{ width: size, height: size, borderWidth: size > 20 ? 3 : 2 }} />
 }
 
-/* ── KVTable ──────────────────────────────────────────────────────────────── */
 import { uid } from '../../utils'
 
 export function KVTable({ rows, onChange, placeholder = ['Key', 'Value'] }) {
@@ -112,7 +109,6 @@ export function KVTable({ rows, onChange, placeholder = ['Key', 'Value'] }) {
   )
 }
 
-/* ── FormGroup ────────────────────────────────────────────────────────────── */
 export function FormGroup({ label, children }) {
   return (
     <div className={styles.formGroup}>
@@ -130,7 +126,6 @@ export function Select({ value, onChange, children, className, style }) {
   return <select className={cx(styles.formSelect, className)} value={value} onChange={onChange} style={style}>{children}</select>
 }
 
-/* ── Empty state ──────────────────────────────────────────────────────────── */
 export function Empty({ icon, text, sub }) {
   return (
     <div className={styles.empty}>
@@ -141,12 +136,6 @@ export function Empty({ icon, text, sub }) {
   )
 }
 
-/* ── Message log ──────────────────────────────────────────────────────────────
-   Generic timestamped frame/event list with a connect/disconnect indicator —
-   shared by the WebSocket, SSE, Socket.io and gRPC-stream tabs.
-   frames: [{ id, direction: 'out'|'in'|'system', timestamp, data }]          */
-/* ── Collapsible JSON tree ────────────────────────────────────────────────────
-   Used by the response Body tab and by the GraphQL schema panel.             */
 export function JsonTree({ value }) {
   return <div className={styles.jsonTree}><JsonNode label={null} value={value} depth={0} /></div>
 }

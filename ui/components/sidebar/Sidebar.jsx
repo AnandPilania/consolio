@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore, apiFetch } from '../../store'
 import { Icon, IconBtn, MethodBadge } from '../shared'
 import { timeAgo, uid, exportPostmanCollection, exportInsomniaCollection, downloadJson } from '../../utils'
@@ -16,10 +16,10 @@ export function Sidebar() {
   const activeTabId  = useStore(s => s.activeTabId)
   const activeReq    = (tabs.find(t => t.id === activeTabId) || tabs[0])?.activeReq
   const [creatingFolderIn, setCreatingFolderIn] = useState(null) // { colId, parentId }
+  const [scores, setScores] = useState({}) // colId -> { score, grade }
 
   const setSbTab = t => useStore.setState({ sbTab: t })
 
-  // Shared by collection ids and folder ids (col_/fld_ prefixes never collide).
   const toggleCol = id => useStore.setState(s => ({
     expandedCols: { ...s.expandedCols, [id]: !s.expandedCols[id] }
   }))
@@ -80,6 +80,17 @@ export function Sidebar() {
     const data = format === 'postman' ? exportPostmanCollection(col) : exportInsomniaCollection(col)
     downloadJson(`${(col.name || 'collection').replace(/\s+/g, '_')}.${format}.json`, data)
   }
+
+  useEffect(() => {
+    collections.forEach(col => {
+      if (!col.requests?.length) return
+      apiFetch(`/api/collections/${col.id}/score`)
+        .then(s => setScores(prev => ({ ...prev, [col.id]: { score: s.score, grade: s.grade } })))
+        .catch(() => {})
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collections.map(c => `${c.id}:${c.requests?.length || 0}`).join(',')])
+
 
   const renderNewFolderInput = (colId, parentId, depth) => (
     <div className={styles.reqItem} style={{ paddingLeft: 24 + depth * 14 }} key="__new_folder">
@@ -205,9 +216,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Content */}
       <div className={styles.content}>
-        {/* Collections */}
         {sbTab === 'collections' && (
           <>
             {collections.length === 0 && (
@@ -228,6 +237,16 @@ export function Sidebar() {
                   <Icon name="folder" size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   <span className={styles.colName}>{col.name}</span>
                   <span className={styles.colCount}>{col.requests?.length || 0}</span>
+                  {scores[col.id] && (
+                    <span
+                      className={styles.gradeChip}
+                      data-grade={scores[col.id].grade}
+                      title={`API readiness score: ${scores[col.id].score}/100`}
+                      onClick={e => { e.stopPropagation(); useStore.setState({ modal: 'dashboard', modalData: { collectionId: col.id } }) }}
+                    >
+                      {scores[col.id].grade}
+                    </span>
+                  )}
                   <select
                     className={styles.exportSel}
                     value=""
@@ -258,7 +277,6 @@ export function Sidebar() {
           </>
         )}
 
-        {/* History */}
         {sbTab === 'history' && (
           <>
             {history.length === 0 && <p className={styles.empty}>No history yet</p>}
@@ -273,7 +291,6 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Interceptor */}
         {sbTab === 'interceptor' && (
           <InterceptorPane intercepted={intercepted} onLoad={loadIntercepted} />
         )}
@@ -282,7 +299,6 @@ export function Sidebar() {
   )
 }
 
-/* ── Status chip ──────────────────────────────────────────────────────────── */
 function StatusChip({ status }) {
   const cls = !status      ? ''
     : status < 300         ? styles.s2xx
@@ -292,7 +308,6 @@ function StatusChip({ status }) {
   return <span className={`${styles.statusChip} ${cls}`}>{status || '—'}</span>
 }
 
-/* ── Interceptor pane ─────────────────────────────────────────────────────── */
 function InterceptorPane({ intercepted, onLoad }) {
   const filterMode   = useStore(s => s.interceptorFilterMode)
   const filters      = useStore(s => s.interceptorFilters)
@@ -303,7 +318,6 @@ function InterceptorPane({ intercepted, onLoad }) {
 
   return (
     <div className={styles.interceptor}>
-      {/* Mode toggle + filter rules */}
       <div className={styles.filterHeader}>
         <Icon name="filter" size={12} style={{ color: 'var(--accent)' }} />
         <span className={styles.filterTitle}>Filter rules</span>
@@ -379,7 +393,6 @@ function InterceptorPane({ intercepted, onLoad }) {
         </button>
       </div>
 
-      {/* Captured list */}
       <div className={styles.interceptDivider}>
         Captured ({intercepted.length})
       </div>

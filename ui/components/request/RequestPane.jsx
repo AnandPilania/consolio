@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore, apiFetch } from '../../store'
-import { Icon, IconBtn, KVTable, FormGroup, Input, Select, Empty, Btn, JsonTree } from '../shared'
+import { Icon, IconBtn, KVTable, FormGroup, Input, Select, Empty, Btn, JsonTree, Spinner } from '../shared'
 import { uid, buildCurl } from '../../utils'
 import styles from './RequestPane.module.css'
 import sharedStyles from '../shared/Shared.module.css'
@@ -73,7 +73,6 @@ export function RequestPane() {
 
   const countEnabled = arr => (arr || []).filter(r => r.enabled && r.key).length
 
-  // Compute test badge
   const testBadge = (() => {
     if (!tab.tests?.length) return null
     const r = tab.testResults || []
@@ -89,7 +88,6 @@ export function RequestPane() {
 
   return (
     <div className={styles.wrap}>
-      {/* ── Multi-tab strip ─────────────────────────────────────────────── */}
       <div className={styles.tabStrip}>
         {tabs.map(t => (
           <div
@@ -115,7 +113,6 @@ export function RequestPane() {
         </button>
       </div>
 
-      {/* ── URL bar ─────────────────────────────────────────────────────── */}
       <div className={styles.urlBar}>
         <select
           className={styles.methodSelect}
@@ -197,9 +194,9 @@ export function RequestPane() {
         )}
       </div>
 
-      {/* ── Request sub-tabs ────────────────────────────────────────────── */}
       <div className={styles.reqTabs}>
         {[
+          { key: 'info',    label: 'Info',      badge: tab.description ? '●' : null },
           { key: 'params',  label: 'Params',   badge: countEnabled(tab.params)  || null },
           { key: 'headers', label: 'Headers',  badge: countEnabled(tab.headers) || null },
           { key: 'body',    label: 'Body',     badge: null },
@@ -230,11 +227,11 @@ export function RequestPane() {
         )}
       </div>
 
-      {/* ── Panel content ───────────────────────────────────────────────── */}
       <div className={styles.panel}>
         {isGrpc && (
           <GrpcPanel tab={tab} ut={ut} loadGrpcProto={loadGrpcProto} />
         )}
+        {!isGrpc && tab.reqTab === 'info'    && <InfoPanel tab={tab} ut={ut} />}
         {!isGrpc && tab.reqTab === 'params'  && <KVTable rows={tab.params}  onChange={v => ut({ params: v })}  placeholder={['Parameter', 'Value']} />}
         {!isGrpc && tab.reqTab === 'headers' && <KVTable rows={tab.headers} onChange={v => ut({ headers: v })} placeholder={['Header',    'Value']} />}
         {!isGrpc && tab.reqTab === 'body'    && (
@@ -253,7 +250,6 @@ export function RequestPane() {
   )
 }
 
-/* ── Body panel ───────────────────────────────────────────────────────────── */
 function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, environment }) {
   const set = (k, v) => onChange({ ...body, [k]: v })
   const TYPES = ['none', 'json', 'text', 'form', 'multipart', 'raw', 'graphql']
@@ -297,7 +293,6 @@ function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, envi
   )
 }
 
-/* ── GraphQL body editor (query + variables + schema introspection) ─────────── */
 function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
   const set = (k, v) => onChange({ ...body, [k]: v })
   const [loading, setLoading] = useState(false)
@@ -351,9 +346,6 @@ function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
   )
 }
 
-/* ── gRPC panel: paste a .proto, pick a method, fill the request JSON ────────
-   Address goes in the URL bar (host:port). Only unary and server-streaming
-   methods are supported — client-streaming/bidi is rejected server-side.    */
 function GrpcPanel({ tab, ut, loadGrpcProto }) {
   return (
     <div className={styles.graphqlWrap}>
@@ -397,7 +389,6 @@ function GrpcPanel({ tab, ut, loadGrpcProto }) {
   )
 }
 
-/* ── Multipart / form-data table (text fields + file fields) ────────────────── */
 function MultipartTable({ rows, onChange }) {
   const update = (i, patch) => onChange(rows.map((r, j) => j === i ? { ...r, ...patch } : r))
   const del    = i => onChange(rows.filter((_, j) => j !== i))
@@ -407,7 +398,6 @@ function MultipartTable({ rows, onChange }) {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      // reader.result is "data:<mime>;base64,<data>" — strip the prefix, keep raw base64.
       const base64 = String(reader.result).split(',')[1] || ''
       update(i, { fileName: file.name, fileType: file.type || 'application/octet-stream', fileSize: file.size, fileData: base64 })
     }
@@ -472,7 +462,93 @@ function MultipartTable({ rows, onChange }) {
   )
 }
 
-/* ── Auth panel ───────────────────────────────────────────────────────────── */
+function InfoPanel({ tab, ut }) {
+  const aiApiKey    = useStore(s => s.aiApiKey)
+  const showNotif   = useStore(s => s.showNotif)
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestion, setSuggestion] = useState(null) // { description, tests } | null
+  const [error, setError] = useState('')
+
+  const canSuggest = Boolean(tab.activeReq && aiApiKey)
+
+  const requestSuggestion = async () => {
+    setError('')
+    setSuggestion(null)
+    setSuggesting(true)
+    try {
+      const res = await apiFetch(
+        `/api/collections/${tab.activeReq.colId}/requests/${tab.activeReq.reqId}/ai-suggest`,
+        { method: 'POST', body: { apiKey: aiApiKey } }
+      )
+      if (res.error) throw new Error(res.error)
+      setSuggestion(res)
+    } catch (e) {
+      setError(e.message || 'AI suggestion failed')
+    }
+    setSuggesting(false)
+  }
+
+  const applySuggestion = () => {
+    if (!suggestion) return
+    ut({
+      description: suggestion.description,
+      tests: [
+        ...(tab.tests || []),
+        ...suggestion.tests.map(t => ({ id: uid(), type: t.type, value: t.value || '' })),
+      ],
+    })
+    setSuggestion(null)
+    showNotif('Suggestion applied — remember to Save', 'success')
+  }
+
+  return (
+    <div className={styles.infoWrap}>
+      <FormGroup label="Description">
+        <textarea
+          className={styles.codeArea}
+          style={{ minHeight: 70 }}
+          placeholder="What does this request do? When should someone use it?"
+          value={tab.description || ''}
+          onChange={e => ut({ description: e.target.value })}
+        />
+      </FormGroup>
+
+      <div className={styles.aiSuggestBar}>
+        <Btn variant="ghost" size="sm" onClick={requestSuggestion} disabled={!canSuggest || suggesting}>
+          {suggesting ? <Spinner size={12} /> : <><Icon name="sparkle" size={12} /> Fix with AI</>}
+        </Btn>
+        {!tab.activeReq && <span className={styles.scriptHint}>Save this request to a collection first.</span>}
+        {tab.activeReq && !aiApiKey && (
+          <span className={styles.scriptHint}>
+            Add an API key in <button className={styles.aiSettingsLink} onClick={() => useStore.setState({ modal: 'settings' })}>Settings</button> to enable AI suggestions.
+          </span>
+        )}
+      </div>
+
+      {error && <p className={styles.aiError}>{error}</p>}
+
+      {suggestion && (
+        <div className={styles.aiSuggestBox}>
+          <p className={styles.aiSuggestLabel}>Suggested description</p>
+          <p className={styles.aiSuggestText}>{suggestion.description}</p>
+          {suggestion.tests.length > 0 && (
+            <>
+              <p className={styles.aiSuggestLabel}>Suggested tests</p>
+              <ul className={styles.aiSuggestTests}>
+                {suggestion.tests.map((t, i) => <li key={i}>{t.type}{t.value ? `: ${t.value}` : ''}</li>)}
+              </ul>
+            </>
+          )}
+          <div className={styles.aiSuggestActions}>
+            <Btn variant="ghost" size="sm" onClick={() => setSuggestion(null)}>Discard</Btn>
+            <Btn variant="primary" size="sm" onClick={applySuggestion}>Apply</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AuthPanel({ auth, onChange }) {
   const set = (k, v) => onChange({ ...auth, [k]: v })
   return (
@@ -516,7 +592,6 @@ function AuthPanel({ auth, onChange }) {
   )
 }
 
-/* ── Script panel ─────────────────────────────────────────────────────────── */
 function ScriptPanel({ code, onChange, type, logs }) {
   return (
     <div className={styles.scriptWrap}>
@@ -544,7 +619,6 @@ function ScriptPanel({ code, onChange, type, logs }) {
   )
 }
 
-/* ── Tests panel ──────────────────────────────────────────────────────────── */
 function TestsPanel({ tests, onChange, results }) {
   const add = () => onChange([...(tests || []), { id: uid(), type: 'status', value: '200', path: '' }])
   const upd = (i, f, v) => onChange(tests.map((t, j) => j === i ? { ...t, [f]: v } : t))

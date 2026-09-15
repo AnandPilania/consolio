@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useStore, apiFetch } from '../../store'
 import { Icon, IconBtn, Btn, FormGroup, Input, Select, Spinner, MethodBadge, KVTable } from '../shared'
-import { parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI, uid, fmtTime, buildHarRequest, GENERATE_TARGETS, downloadJson, downloadText, buildJUnitXml } from '../../utils'
+import { parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI, uid, fmtTime, timeAgo, buildHarRequest, GENERATE_TARGETS, downloadJson, downloadText, buildJUnitXml } from '../../utils'
 import styles from './Modals.module.css'
 
-/* ── Modal shell ──────────────────────────────────────────────────────────── */
 function Modal({ title, icon, onClose, children, footer, wide }) {
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -21,7 +20,6 @@ function Modal({ title, icon, onClose, children, footer, wide }) {
   )
 }
 
-/* ── New Collection ───────────────────────────────────────────────────────── */
 export function NewCollectionModal() {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
@@ -55,9 +53,6 @@ export function NewCollectionModal() {
   )
 }
 
-/* ── Import ───────────────────────────────────────────────────────────────── */
-// Creates the collection, then its folders (sequentially, so client-temp folder
-// ids can be remapped to server-assigned ids), then bulk-creates the requests.
 async function createCollectionFromImport(imported, description) {
   const col = await apiFetch('/api/collections', { method: 'POST', body: { name: imported.name, description } })
   const idMap = {}
@@ -166,7 +161,6 @@ export function ImportModal() {
   )
 }
 
-/* ── Code generation ──────────────────────────────────────────────────────── */
 export function CodeGenModal() {
   const tabs         = useStore(s => s.tabs)
   const activeTabId  = useStore(s => s.activeTabId)
@@ -228,7 +222,6 @@ export function CodeGenModal() {
   )
 }
 
-/* ── Collection Runner ────────────────────────────────────────────────────── */
 export function RunnerModal() {
   const collections = useStore(s => s.collections)
   const environments = useStore(s => s.environments)
@@ -395,12 +388,13 @@ export function RunnerModal() {
   )
 }
 
-/* ── Settings ─────────────────────────────────────────────────────────────── */
 export function SettingsModal() {
   const config       = useStore(s => s.config)
   const environments = useStore(s => s.environments)
   const activeEnvId  = useStore(s => s.activeEnvId)
   const showNotif    = useStore(s => s.showNotif)
+  const aiApiKey     = useStore(s => s.aiApiKey)
+  const setAiApiKey  = useStore(s => s.setAiApiKey)
   const close = () => useStore.setState({ modal: null })
 
   const [form,    setForm]    = useState({ ...config })
@@ -451,7 +445,6 @@ export function SettingsModal() {
     <Modal title="Settings" icon="settings" onClose={close} wide footer={
       <><Btn variant="ghost" onClick={close}>Cancel</Btn><Btn variant="primary" onClick={saveSettings}>Save Settings</Btn></>
     }>
-      {/* ── Project ─────────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Project</h3>
         <div className={styles.settingsGrid}>
@@ -502,7 +495,26 @@ export function SettingsModal() {
         </div>
       </section>
 
-      {/* ── Environments ────────────────────────────────────────────────── */}
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>AI Assist</h3>
+        <div className={styles.settingsGrid}>
+          <FormGroup label="Anthropic API key">
+            <Input
+              type="password"
+              value={aiApiKey}
+              onChange={e => setAiApiKey(e.target.value)}
+              placeholder="sk-ant-…"
+            />
+          </FormGroup>
+        </div>
+        <p className={styles.settingsHint}>
+          Powers the "Fix with AI" button on a request's Info tab, which suggests a
+          description and test assertions. Bring-your-own-key — stored only in this
+          browser's local storage, sent only when you click that button, and never
+          saved to the project or to consolio's own storage.
+        </p>
+      </section>
+
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>Environments</h3>
@@ -528,7 +540,6 @@ export function SettingsModal() {
           {environments.length === 0 && <p className={styles.noEnvs}>No environments yet</p>}
         </div>
 
-        {/* Inline editor */}
         {envEdit && (
           <div className={styles.envEditor}>
             <div className={styles.envEditorTitle}>
@@ -599,7 +610,6 @@ export function SettingsModal() {
         )}
       </section>
 
-      {/* ── Browser interceptor hint ─────────────────────────────────────── */}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Browser Interceptor</h3>
         <div className={styles.interceptorHint}>
@@ -613,7 +623,6 @@ export function SettingsModal() {
   )
 }
 
-/* ── Plugin manager ───────────────────────────────────────────────────────── */
 export function PluginManagerModal() {
   const showNotif = useStore(s => s.showNotif)
   const close = () => useStore.setState({ modal: null })
@@ -732,7 +741,6 @@ export function PluginManagerModal() {
   )
 }
 
-/* ── Mock servers ─────────────────────────────────────────────────────────── */
 export function MockManagerModal() {
   const showNotif = useStore(s => s.showNotif)
   const close = () => useStore.setState({ modal: null })
@@ -869,5 +877,127 @@ export function MockManagerModal() {
         </div>
       </div>
     </Modal>
+  )
+}
+
+export function DashboardModal() {
+  const collections = useStore(s => s.collections)
+  const modalData    = useStore(s => s.modalData)
+  const close = () => useStore.setState({ modal: null })
+
+  const [collectionId, setCollectionId] = useState(modalData?.collectionId || '')
+  const [analytics, setAnalytics] = useState(null)
+  const [score, setScore] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const qs = collectionId ? `?collectionId=${collectionId}` : ''
+      const [a, s] = await Promise.all([
+        apiFetch(`/api/history/analytics${qs}`),
+        collectionId ? apiFetch(`/api/collections/${collectionId}/score`) : Promise.resolve(null),
+      ])
+      setAnalytics(a)
+      setScore(s)
+    } catch { }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [collectionId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <Modal title="Dashboard" icon="barChart" onClose={close} wide footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
+      <div className={styles.settingsGrid} style={{ marginBottom: 14 }}>
+        <FormGroup label="Scope">
+          <Select value={collectionId} onChange={e => setCollectionId(e.target.value)}>
+            <option value="">All collections</option>
+            {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </FormGroup>
+      </div>
+
+      {loading && <Spinner size={16} />}
+
+      {!loading && analytics && (
+        <>
+          <div className={styles.dashStatRow}>
+            <DashStat label="Total requests" value={analytics.totalRequests} />
+            <DashStat label="Avg latency"    value={`${analytics.avgLatencyMs}ms`} />
+            <DashStat label="P95 latency"    value={`${analytics.p95LatencyMs}ms`} />
+            <DashStat
+              label="Error rate" value={`${analytics.errorRate}%`}
+              tone={analytics.errorRate > 10 ? 'err' : analytics.errorRate > 0 ? 'warn' : 'ok'}
+            />
+            {score && (
+              <DashStat
+                label="Readiness score" value={`${score.grade} · ${score.score}`}
+                tone={score.grade === 'A' || score.grade === 'B' ? 'ok' : score.grade === 'F' ? 'err' : 'warn'}
+              />
+            )}
+          </div>
+
+          {score?.topIssues?.length > 0 && (
+            <>
+              <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>Top issues</h3>
+              <div className={styles.mockList} style={{ width: 'auto' }}>
+                {score.topIssues.map(issue => (
+                  <div key={issue.id} className={styles.mockRow} style={{ cursor: 'default' }}>
+                    <div className={styles.mockInfo}>
+                      <span className={styles.mockName}>{issue.label}</span>
+                      <span className={styles.mockMeta}>{issue.fix}</span>
+                    </div>
+                    <span className={styles.colCount}>{issue.count} request{issue.count === 1 ? '' : 's'}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>By request</h3>
+          {analytics.requestBreakdown.length === 0 && (
+            <p className={styles.runnerEmpty}>No tracked calls yet — requests sent from a saved collection request will show up here.</p>
+          )}
+          <div className={styles.mockList} style={{ width: 'auto' }}>
+            {analytics.requestBreakdown.map(r => (
+              <div key={r.requestId} className={styles.mockRow} style={{ cursor: 'default' }}>
+                <div className={styles.mockInfo}>
+                  <span className={styles.mockName}>{r.requestName}</span>
+                  <span className={styles.mockMeta}>{r.totalRequests} calls · avg {r.avgLatencyMs}ms · {r.errorRate}% errors</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {analytics.recentErrors.length > 0 && (
+            <>
+              <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>Recent errors</h3>
+              <div className={styles.mockList} style={{ width: 'auto' }}>
+                {analytics.recentErrors.map(e => (
+                  <div key={e.id} className={styles.mockRow} style={{ cursor: 'default' }}>
+                    <MethodBadge method={e.method || 'GET'} small />
+                    <div className={styles.mockInfo}>
+                      <span className={styles.mockName}>{e.requestName || e.url}</span>
+                      <span className={styles.mockMeta}>{timeAgo(e.timestamp)}</span>
+                    </div>
+                    <span className={styles.colCount} style={{ color: 'var(--err)' }}>{e.status} {e.statusText}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </Modal>
+  )
+}
+
+function DashStat({ label, value, tone }) {
+  const color = tone === 'ok' ? 'var(--ok)' : tone === 'err' ? 'var(--err)' : tone === 'warn' ? 'var(--warn)' : 'var(--tx-base)'
+  return (
+    <div className={styles.dashStat}>
+      <span className={styles.dashStatValue} style={{ color }}>{value}</span>
+      <span className={styles.dashStatLabel}>{label}</span>
+    </div>
   )
 }

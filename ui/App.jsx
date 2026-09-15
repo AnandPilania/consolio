@@ -6,7 +6,7 @@ import { Sidebar }        from './components/sidebar/Sidebar'
 import { RequestPane }    from './components/request/RequestPane'
 import { ResponsePane }   from './components/response/ResponsePane'
 import { CustomiseModal } from './components/modals/CustomiseModal'
-import { NewCollectionModal, ImportModal, RunnerModal, SettingsModal, CodeGenModal, MockManagerModal, PluginManagerModal } from './components/modals/Modals'
+import { NewCollectionModal, ImportModal, RunnerModal, SettingsModal, CodeGenModal, MockManagerModal, PluginManagerModal, DashboardModal } from './components/modals/Modals'
 import { Notification }   from './components/shared/Notification'
 import styles from './App.module.css'
 
@@ -17,7 +17,6 @@ export default function App() {
   const modal          = useStore(s => s.modal)
   const addIntercepted = useStore(s => s.addIntercepted)
 
-  /* ── Bootstrap ─────────────────────────────────────────────────────────── */
   useEffect(() => {
     boot()
 
@@ -56,7 +55,6 @@ export default function App() {
       <Topbar />
 
       <div className={styles.workspace}>
-        {/* ── Horizontal split: Sidebar | Main ──────────────────────────── */}
         <PanelGroup direction="horizontal" className={styles.hGroup}>
 
           {sidebarPanel.visible
@@ -78,7 +76,6 @@ export default function App() {
             : null
           }
 
-          {/* ── Vertical split: Request / Response ──────────────────────── */}
           <Panel id="main" style={{ overflow: 'hidden', minWidth: 0 }}>
             <PanelGroup direction="vertical" className={styles.vGroup}>
 
@@ -127,7 +124,6 @@ export default function App() {
         </PanelGroup>
       </div>
 
-      {/* ── Modals ────────────────────────────────────────────────────────── */}
       {showCustomise             && <CustomiseModal />}
       {modal === 'newCollection' && <NewCollectionModal />}
       {modal === 'import'        && <ImportModal />}
@@ -136,6 +132,7 @@ export default function App() {
       {modal === 'codegen'       && <CodeGenModal />}
       {modal === 'mocks'         && <MockManagerModal />}
       {modal === 'plugins'       && <PluginManagerModal />}
+      {modal === 'dashboard'     && <DashboardModal />}
 
       <Notification />
     </div>

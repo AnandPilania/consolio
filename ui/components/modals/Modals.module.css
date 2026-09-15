@@ -652,3 +652,31 @@
     align-items: center;
     gap: 8px;
 }
+
+/* ── Dashboard ────────────────────────────────────────────────────────────── */
+.dashStatRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dashStat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 14px;
+    background: var(--bg-overlay);
+    border: 1px solid var(--bd-subtle);
+    border-radius: 8px;
+    min-width: 110px;
+}
+
+.dashStatValue {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.dashStatLabel {
+    font-size: 10.5px;
+    color: var(--tx-faint);
+}

@@ -25,6 +25,7 @@ export function makeTab(overrides = {}) {
         name: 'New Request',
         method: 'GET',
         url: '',
+        description: '',
         params: [{ id: uid(), key: '', value: '', enabled: true }],
         headers: [{ id: uid(), key: '', value: '', enabled: true }],
         body: { type: 'none', content: '', fields: [] },
@@ -60,7 +61,6 @@ export function makeTab(overrides = {}) {
     }
 }
 
-/* ── Interceptor filter factory ───────────────────────────────────────────── */
 export function makeFilter(overrides = {}) {
     return {
         id: uid(),
@@ -72,7 +72,6 @@ export function makeFilter(overrides = {}) {
     }
 }
 
-/* ── Main store ───────────────────────────────────────────────────────────── */
 export const useStore = create(
     persist(
         (set, get) => ({
@@ -112,7 +111,11 @@ export const useStore = create(
             /* Notification */
             notif: null,
 
-            /* ── Computed helpers ──────────────────────────────────────────────── */
+            /* AI-assisted fixes — bring-your-own-key, kept client-side only (never sent
+               to the server except as part of an explicit ai-suggest request). */
+            aiApiKey: '',
+            setAiApiKey: (key) => set({ aiApiKey: key }),
+
             getActiveTab() {
                 const { tabs, activeTabId } = get()
                 return tabs.find(t => t.id === activeTabId) || tabs[0]
@@ -129,7 +132,6 @@ export const useStore = create(
                 )
             },
 
-            /* ── Tabs ──────────────────────────────────────────────────────────── */
             newTab(overrides) {
                 const t = makeTab(overrides)
                 set(s => ({ tabs: [...s.tabs, t], activeTabId: t.id }))
@@ -153,7 +155,6 @@ export const useStore = create(
                 updateTab(getActiveTab().id, patch)
             },
 
-            /* ── Request send ──────────────────────────────────────────────────── */
             async sendRequest() {
                 const { getActiveTab, getEnvVars, activeEnvId, updateTab, showNotif } = get()
                 const tab = getActiveTab()
@@ -171,6 +172,9 @@ export const useStore = create(
                             environment: getEnvVars(), saveToHistory: true,
                             preScript: tab.preScript, postScript: tab.postScript,
                             tests: tab.tests, environmentId: activeEnvId,
+                            collectionId: tab.activeReq?.colId || null,
+                            requestId: tab.activeReq?.reqId || null,
+                            requestName: tab.reqName || tab.name || null,
                         }
                     })
                     if (res.preScriptError) showNotif('Pre-script: ' + res.preScriptError, 'error')
@@ -189,7 +193,6 @@ export const useStore = create(
                 }
             },
 
-            /* ── WebSocket (server proxies the real connection; see server/wsProxy.js) ── */
             appendWsFrame(tabId, frame) {
                 set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, wsFrames: [...(t.wsFrames || []), frame].slice(-500) } : t) }))
             },
@@ -238,7 +241,6 @@ export const useStore = create(
                 else showNotif('Not connected', 'error')
             },
 
-            /* ── SSE (same server-proxied model as WebSocket, one-way) ───────────── */
             appendSseFrame(tabId, frame) {
                 set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, sseFrames: [...(t.sseFrames || []), frame].slice(-500) } : t) }))
             },
@@ -281,7 +283,6 @@ export const useStore = create(
                 }
             },
 
-            /* ── Socket.io (event-based — same server-proxied model, plus an event name) ── */
             appendSioFrame(tabId, frame) {
                 set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, sioFrames: [...(t.sioFrames || []), frame].slice(-500) } : t) }))
             },
@@ -331,7 +332,6 @@ export const useStore = create(
                 else showNotif('Not connected', 'error')
             },
 
-            /* ── gRPC (proto pasted in, method picked by full path "pkg.Service/Method") ── */
             appendGrpcFrame(tabId, frame) {
                 set(s => ({ tabs: s.tabs.map(t => t.id === tabId ? { ...t, grpcFrames: [...(t.grpcFrames || []), frame].slice(-500) } : t) }))
             },
@@ -339,8 +339,6 @@ export const useStore = create(
                 const { getActiveTab, updateTab } = get()
                 updateTab(getActiveTab().id, { grpcFrames: [] })
             },
-            // Lazily opens (or reuses) the per-tab gRPC control channel, then sends `action`
-            // once it's open — used by both loadGrpcProto() and callGrpc().
             grpcSend(action) {
                 const { getActiveTab, updateTab, appendGrpcFrame, showNotif } = get()
                 const tabId = getActiveTab().id
@@ -391,13 +389,13 @@ export const useStore = create(
                 }
             },
 
-            /* ── Collections ───────────────────────────────────────────────────── */
             loadRequest(col, req) {
                 const { getActiveTab, updateTab } = get()
                 updateTab(getActiveTab().id, {
                     activeReq: { colId: col.id, reqId: req.id },
                     method: req.method || 'GET',
                     url: req.url || '',
+                    description: req.description || '',
                     params: req.params?.length ? req.params : [{ id: uid(), key: '', value: '', enabled: true }],
                     headers: req.headers?.length ? req.headers : [{ id: uid(), key: '', value: '', enabled: true }],
                     body: req.body || { type: 'none', content: '', fields: [] },
@@ -408,9 +406,6 @@ export const useStore = create(
                     reqName: req.name || '',
                     response: null, testResults: [], preLogs: [], postLogs: [],
                     reqTab: 'params',
-                    // Protocol mode isn't a persisted field on saved requests — always land
-                    // back in plain HTTP mode when opening one, even if this tab was previously
-                    // left in WS/SSE/Socket.IO/gRPC mode.
                     wsMode: false, sseMode: false, sioMode: false, grpcMode: false,
                 })
             },
@@ -419,6 +414,7 @@ export const useStore = create(
                 const tab = getActiveTab()
                 const payload = {
                     name: tab.reqName || tab.url || 'New Request',
+                    description: tab.description || '',
                     method: tab.method, url: tab.url,
                     params: tab.params, headers: tab.headers,
                     body: tab.body, auth: tab.auth,
@@ -440,7 +436,6 @@ export const useStore = create(
                 }
             },
 
-            /* ── Panels ────────────────────────────────────────────────────────── */
             togglePanel(key) {
                 set(s => ({ panels: { ...s.panels, [key]: { ...s.panels[key], visible: !s.panels[key].visible } } }))
             },
@@ -449,7 +444,6 @@ export const useStore = create(
             },
             resetPanels() { set({ panels: DEFAULT_PANELS }) },
 
-            /* ── Interceptor ───────────────────────────────────────────────────── */
             addIntercepted(entry) {
                 const { interceptorFilterMode, interceptorFilters } = get()
                 const filters = interceptorFilters.filter(f => f.enabled && f.pattern)
@@ -490,13 +484,11 @@ export const useStore = create(
                 set(s => ({ interceptorFilters: s.interceptorFilters.filter(f => f.id !== id) }))
             },
 
-            /* ── Notifications ─────────────────────────────────────────────────── */
             showNotif(msg, type = 'success') {
                 set({ notif: { msg, type, id: uid() } })
                 setTimeout(() => set(s => s.notif?.msg === msg ? { notif: null } : s), 2800)
             },
 
-            /* ── Bootstrap ─────────────────────────────────────────────────────── */
             async boot() {
                 try {
                     const [cols, envs, hist, cfg] = await Promise.all([
@@ -519,9 +511,8 @@ export const useStore = create(
                 interceptorFilters: s.interceptorFilters,
                 activeEnvId: s.activeEnvId,
                 expandedCols: s.expandedCols,
+                aiApiKey: s.aiApiKey,
             }),
-            // Merge persisted panels with DEFAULT_PANELS so any missing fields
-            // (e.g. from an older saved schema) are always filled in safely.
             merge: (persisted, current) => ({
                 ...current,
                 ...persisted,
@@ -531,7 +522,6 @@ export const useStore = create(
     )
 )
 
-/* ── API helper ───────────────────────────────────────────────────────────── */
 export async function apiFetch(path, opts = {}) {
     const res = await fetch(window.location.origin + path, {
         headers: { 'Content-Type': 'application/json' },
