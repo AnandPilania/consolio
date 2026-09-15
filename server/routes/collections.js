@@ -89,6 +89,33 @@ export async function collectionRoutes(fastify, { storage }) {
         }
     });
 
+    fastify.get('/api/collections/:id/mcp-manifest', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        if (!col.requests?.length) return { tools: [], command: null };
+
+        const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+        const { registerCollectionTools } = await import('../mcpServer.js');
+        const previewServer = new McpServer({ name: 'preview', version: '0.0.0' });
+        const registered = registerCollectionTools(previewServer, col, { storage });
+
+        const tools = registered.map(r => {
+            const request = col.requests.find(req2 => req2.id === r.requestId);
+            return { name: r.toolName, method: request?.method, url: request?.url, description: request?.description || '' };
+        });
+
+        const configSnippet = {
+            mcpServers: {
+                [`consolio-${col.name.toLowerCase().replace(/\s+/g, '-')}`]: {
+                    command: 'npx',
+                    args: ['consolio', 'mcp', 'serve', col.id, '--project', storage.projectPath],
+                },
+            },
+        };
+
+        return { tools, configSnippet };
+    });
+
     fastify.put('/api/collections/:colId/requests/:reqId', async (req, reply) => {
         const col = storage.getCollection(req.params.colId);
         if (!col) return reply.status(404).send({ error: 'Collection not found' });

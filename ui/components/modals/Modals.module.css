@@ -155,6 +155,46 @@
     border: 1px solid color-mix(in srgb, var(--err) 25%, transparent);
 }
 
+.scanForm {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.scanResults {
+    margin-top: 6px;
+    border: 1px solid var(--bd-subtle);
+    border-radius: var(--r-md);
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.scanResultsHeader {
+    font-size: 11px;
+    color: var(--tx-faint);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--bd-faint);
+    margin: 0;
+}
+
+.scanResultRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--bd-faint);
+}
+.scanResultRow:last-child { border-bottom: none; }
+
+.scanResultUrl {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--tx-base);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ── Runner ───────────────────────────────────────────────────────────────── */
 .runnerControls {
     display: flex;
@@ -679,4 +719,33 @@
 .dashStatLabel {
     font-size: 10.5px;
     color: var(--tx-faint);
+}
+
+.mcpSectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+}
+
+.mcpConfigBox {
+    margin-top: 10px;
+    border: 1px solid var(--bd-subtle);
+    border-radius: var(--r-md);
+    background: var(--bg-overlay);
+    padding: 12px 14px;
+}
+
+.mcpConfigCode {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--tx-base);
+    background: var(--bg-raised);
+    border: 1px solid var(--bd-faint);
+    border-radius: var(--r-sm);
+    padding: 10px 12px;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0;
 }

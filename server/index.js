@@ -14,6 +14,7 @@ import { environmentRoutes, historyRoutes, configRoutes } from './routes/environ
 import { versionRoutes, getLatestVersion } from './routes/version.js';
 import { mockRoutes } from './routes/mocks.js';
 import { pluginRoutes } from './routes/plugins.js';
+import { scanRoutes } from './routes/scan.js';
 import { handleWsProxyConnection, handleWsProxyMessage } from './wsProxy.js';
 import { handleSseProxyConnection, handleSseProxyMessage } from './sseProxy.js';
 import { handleSocketIoProxyConnection, handleSocketIoProxyMessage } from './socketioProxy.js';
@@ -29,15 +30,9 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
 
     const fastify = Fastify({
         logger: false,
-        // Raise Fastify's default 1MB JSON body limit so multipart file uploads
-        // (sent as base64 inside the /api/execute JSON payload) aren't rejected.
-        // Base64 inflates size ~33%, so 50MB here comfortably covers ~35MB source files.
         bodyLimit: 50 * 1024 * 1024 // 50MB
     });
 
-    // The UI's apiFetch() helper always sends Content-Type: application/json, even for
-    // body-less calls (e.g. POST /api/mocks/:id/start) — Fastify's default JSON parser
-    // rejects an empty body under that content-type, so treat empty as {} instead of 400ing.
     fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
         if (!body) return done(null, undefined);
         try { done(null, JSON.parse(body)); } catch (err) { done(err); }
@@ -128,6 +123,7 @@ export async function startServer({ port = 4242, autoOpen = true, projectPath = 
     await fastify.register(versionRoutes);
     await fastify.register(mockRoutes, { storage });
     await fastify.register(pluginRoutes, { storage });
+    await fastify.register(scanRoutes, { storage });
 
     fastify.post('/api/interceptor/capture', async (req) => {
         const entry = req.body;

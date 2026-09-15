@@ -17,6 +17,7 @@ export default function App() {
   const modal          = useStore(s => s.modal)
   const addIntercepted = useStore(s => s.addIntercepted)
 
+  /* ── Bootstrap ─────────────────────────────────────────────────────────── */
   useEffect(() => {
     boot()
 
@@ -55,6 +56,7 @@ export default function App() {
       <Topbar />
 
       <div className={styles.workspace}>
+        {/* ── Horizontal split: Sidebar | Main ──────────────────────────── */}
         <PanelGroup direction="horizontal" className={styles.hGroup}>
 
           {sidebarPanel.visible
@@ -76,6 +78,7 @@ export default function App() {
             : null
           }
 
+          {/* ── Vertical split: Request / Response ──────────────────────── */}
           <Panel id="main" style={{ overflow: 'hidden', minWidth: 0 }}>
             <PanelGroup direction="vertical" className={styles.vGroup}>
 
@@ -124,6 +127,7 @@ export default function App() {
         </PanelGroup>
       </div>
 
+      {/* ── Modals ────────────────────────────────────────────────────────── */}
       {showCustomise             && <CustomiseModal />}
       {modal === 'newCollection' && <NewCollectionModal />}
       {modal === 'import'        && <ImportModal />}

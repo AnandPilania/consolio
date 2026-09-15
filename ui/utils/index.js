@@ -40,8 +40,6 @@ export function applyEnv(str, env = {}, secretKeys) {
     return str.replace(/\{\{(\w+)\}\}/g, (_, k) => (secrets?.has(k) ? `{{${k}}}` : env[k] ?? `{{${k}}}`))
 }
 
-// Shared by buildCurl and buildHarRequest: resolves {{env}} placeholders into the
-// final URL (with query params merged in) and a flat header map (incl. auth headers).
 function resolveRequestParts({ url, headers = [], params = [], auth, environment = {}, secretKeys = [] }) {
     const ae = s => applyEnv(s, environment, secretKeys)
     let finalUrl = ae(url || '')
@@ -74,8 +72,6 @@ function graphqlBodyJson(body, ae) {
     return JSON.stringify({ query: ae(body.query || ''), variables })
 }
 
-// secretKeys: variable keys flagged "secret" — left as {{placeholder}} instead of
-// resolved, so a copied/shared cURL command never carries a real secret value.
 export function buildCurl({ method, url, headers = [], params = [], body, auth, environment = {}, secretKeys = [] }) {
     const { finalUrl, headerMap: hmap, ae } = resolveRequestParts({ url, headers, params, auth, environment, secretKeys })
     const parts = [`curl -X ${method}`]
@@ -98,21 +94,18 @@ export function buildCurl({ method, url, headers = [], params = [], body, auth, 
     return parts.join(' \\\n')
 }
 
-// Languages/clients offered in the "Generate Code" panel — target/client keys
-// match httpsnippet's own registry (see `availableTargets()` in the httpsnippet package).
 export const GENERATE_TARGETS = [
-    { label: 'cURL',               target: 'shell',      client: 'curl' },
-    { label: 'JavaScript – Fetch', target: 'javascript',  client: 'fetch' },
-    { label: 'JavaScript – Axios', target: 'javascript',  client: 'axios' },
-    { label: 'Node.js – Fetch',    target: 'node',        client: 'fetch' },
-    { label: 'Python – Requests',  target: 'python',      client: 'requests' },
-    { label: 'Go',                 target: 'go',          client: 'native' },
-    { label: 'Java – OkHttp',      target: 'java',        client: 'okhttp' },
-    { label: 'PHP – cURL',         target: 'php',         client: 'curl' },
-    { label: 'Ruby',               target: 'ruby',        client: 'native' },
+    { label: 'cURL', target: 'shell', client: 'curl' },
+    { label: 'JavaScript – Fetch', target: 'javascript', client: 'fetch' },
+    { label: 'JavaScript – Axios', target: 'javascript', client: 'axios' },
+    { label: 'Node.js – Fetch', target: 'node', client: 'fetch' },
+    { label: 'Python – Requests', target: 'python', client: 'requests' },
+    { label: 'Go', target: 'go', client: 'native' },
+    { label: 'Java – OkHttp', target: 'java', client: 'okhttp' },
+    { label: 'PHP – cURL', target: 'php', client: 'curl' },
+    { label: 'Ruby', target: 'ruby', client: 'native' },
 ]
 
-// Builds the HAR-like request object httpsnippet's HTTPSnippet expects.
 export function buildHarRequest({ method, url, headers = [], params = [], body, auth, environment = {}, secretKeys = [] }) {
     const { finalUrl, headerMap, ae } = resolveRequestParts({ url, headers, params, auth, environment, secretKeys })
     const harHeaders = Object.entries(headerMap).map(([name, value]) => ({ name, value }))
@@ -148,8 +141,6 @@ export function buildHarRequest({ method, url, headers = [], params = [], body, 
     }
 }
 
-// Tokenize a shell-like command line, respecting '...' and "..." quoting
-// (with \" escapes inside double quotes, matching curl's own copy-as-cURL output).
 function tokenizeCurl(s) {
     const tokens = []
     let cur = '', quote = null
@@ -291,8 +282,6 @@ export function importPostmanCollection(json) {
     return col
 }
 
-// Insomnia v4 export: a flat `resources` array, each tagged by `_type`.
-// request_group == folder (nests via parentId), request == request (nests via parentId too).
 export function importInsomniaExport(json) {
     const resources = json.resources || []
     const workspace = resources.find(r => r._type === 'workspace')
@@ -334,9 +323,6 @@ export function importInsomniaExport(json) {
     return col
 }
 
-// OpenAPI 3.x import — maps paths × methods into flat requests, one folder per tag if present.
-// `raw` can be JSON or YAML; `parseYaml` is the `yaml` package's `parse()` function (caller-supplied
-// so this file stays framework/runtime agnostic and the dependency is only paid for when used).
 export function importOpenAPI(raw, parseYaml) {
     let spec
     try { spec = JSON.parse(raw) } catch { spec = parseYaml(raw) }
@@ -362,11 +348,11 @@ export function importOpenAPI(raw, parseYaml) {
         Object.entries(methods).forEach(([method, op]) => {
             if (!['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method)) return
             const headers = [], params = []
-            ;(op.parameters || []).forEach(p => {
-                const entry = { id: uid(), key: p.name, value: p.example ?? p.schema?.example ?? p.schema?.default ?? '', enabled: true }
-                if (p.in === 'header') headers.push(entry)
-                else if (p.in === 'query') params.push(entry)
-            })
+                ; (op.parameters || []).forEach(p => {
+                    const entry = { id: uid(), key: p.name, value: p.example ?? p.schema?.example ?? p.schema?.default ?? '', enabled: true }
+                    if (p.in === 'header') headers.push(entry)
+                    else if (p.in === 'query') params.push(entry)
+                })
             let body = { type: 'none', content: '', fields: [] }
             const jsonBody = op.requestBody?.content?.['application/json']
             if (jsonBody) {
@@ -375,7 +361,8 @@ export function importOpenAPI(raw, parseYaml) {
             }
             col.requests.push({
                 id: `req_${uid()}`, name: op.summary || op.operationId || `${method.toUpperCase()} ${path}`,
-                method: method.toUpperCase(), url: baseUrl + path,
+                method: method.toUpperCase(),
+                url: baseUrl + path.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, '{{$1}}'),
                 headers, params, body, auth: { type: 'none' },
                 folderId: folderFor(op.tags?.[0]),
                 created: new Date().toISOString(),
@@ -385,7 +372,6 @@ export function importOpenAPI(raw, parseYaml) {
     return col
 }
 
-/* ── Export ───────────────────────────────────────────────────────────────── */
 function bodyToPostman(body) {
     if (!body || body.type === 'none') return undefined
     if (body.type === 'json' || body.type === 'text') return { mode: 'raw', raw: body.content || '' }
@@ -417,7 +403,6 @@ function requestToPostmanItem(r) {
     }
 }
 
-// Recursively nests requests under their folders (Postman's own `item`-of-`item` grouping).
 export function exportPostmanCollection(col) {
     const folders = col.folders || []
     const buildFolder = parentId => [
@@ -465,7 +450,7 @@ export function exportInsomniaCollection(col) {
             body: bodyToInsomnia(r.body),
             authentication: r.auth?.type === 'bearer' ? { type: 'bearer', token: r.auth.token || '' }
                 : r.auth?.type === 'basic' ? { type: 'basic', username: r.auth.username || '', password: r.auth.password || '' }
-                : {},
+                    : {},
         })),
     ]
 
@@ -476,8 +461,110 @@ export function exportInsomniaCollection(col) {
     }
 }
 
-// Line-based LCS diff — old vs new. Returns null (caller shows a fallback) past the
-// size guard below, so a huge response body can't hang the tab on an O(n*m) table.
+function pathToOpenApiTemplate(url) {
+    let path = url.replace(/^[a-zA-Z]+:\/\/[^/]+/, '')
+    if (!path.startsWith('/')) path = '/' + path
+    path = path.split('?')[0]
+    return path
+        .replace(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g, (_, name) => `{${name}}`)
+        .replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, name) => `{${name}}`)
+}
+
+function extractPathParamNames(templatedPath) {
+    return [...templatedPath.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map(m => m[1])
+}
+
+function requestBodyToOpenApi(body) {
+    if (!body || body.type === 'none') return undefined
+    if (body.type === 'json') {
+        let example
+        try { example = body.content ? JSON.parse(body.content) : undefined } catch { /* leave undefined if not valid JSON */ }
+        return {
+            content: {
+                'application/json': {
+                    schema: { type: 'object' },
+                    ...(example !== undefined ? { example } : {}),
+                },
+            },
+        }
+    }
+    if (body.type === 'text') {
+        return { content: { 'text/plain': { schema: { type: 'string' }, example: body.content || '' } } }
+    }
+    if (body.type === 'form' || body.type === 'multipart') {
+        const properties = {}
+        for (const f of (body.fields || [])) if (f.key) properties[f.key] = { type: 'string', example: f.value }
+        const mime = body.type === 'form' ? 'application/x-www-form-urlencoded' : 'multipart/form-data'
+        return { content: { [mime]: { schema: { type: 'object', properties } } } }
+    }
+    return undefined
+}
+
+function authToOpenApiSecurity(auth, securitySchemes) {
+    if (!auth || auth.type === 'none') return { security: undefined };
+    if (auth.type === 'bearer') {
+        securitySchemes.bearerAuth = { type: 'http', scheme: 'bearer' }
+        return { security: [{ bearerAuth: [] }] }
+    }
+    if (auth.type === 'basic') {
+        securitySchemes.basicAuth = { type: 'http', scheme: 'basic' }
+        return { security: [{ basicAuth: [] }] }
+    }
+    if (auth.type === 'apikey') {
+        securitySchemes.apiKeyAuth = { type: 'apiKey', in: 'header', name: auth.key || 'X-API-Key' }
+        return { security: [{ apiKeyAuth: [] }] }
+    }
+    return { security: undefined }
+}
+
+export function exportOpenAPI(col) {
+    const folderNameById = {}
+    for (const f of (col.folders || [])) folderNameById[f.id] = f.name
+
+    const securitySchemes = {}
+    const paths = {}
+
+    for (const r of (col.requests || [])) {
+        const templatedPath = pathToOpenApiTemplate(r.url || '')
+        const pathParamNames = extractPathParamNames(templatedPath)
+        const method = (r.method || 'GET').toLowerCase()
+
+        if (!paths[templatedPath]) paths[templatedPath] = {}
+
+        const parameters = [
+            ...pathParamNames.map(name => ({ name, in: 'path', required: true, schema: { type: 'string' } })),
+            ...(r.params || []).filter(p => p.key).map(p => ({
+                name: p.key, in: 'query', required: false, schema: { type: 'string' },
+                ...(p.value ? { example: p.value } : {}),
+            })),
+            ...(r.headers || []).filter(h => h.key && !/^content-type$/i.test(h.key)).map(h => ({
+                name: h.key, in: 'header', required: false, schema: { type: 'string' },
+            })),
+        ]
+
+        const { security } = authToOpenApiSecurity(r.auth, securitySchemes)
+        const requestBody = requestBodyToOpenApi(r.body)
+
+        paths[templatedPath][method] = {
+            summary: r.name || `${r.method} ${templatedPath}`,
+            ...(r.description ? { description: r.description } : {}),
+            ...(r.folderId && folderNameById[r.folderId] ? { tags: [folderNameById[r.folderId]] } : {}),
+            parameters: parameters.length ? parameters : undefined,
+            ...(requestBody ? { requestBody } : {}),
+            ...(security ? { security } : {}),
+            responses: { '200': { description: 'Successful response' } },
+        }
+    }
+
+    return {
+        openapi: '3.1.0',
+        info: { title: col.name || 'Exported API', description: col.description || '', version: '1.0.0' },
+        paths,
+        ...(Object.keys(securitySchemes).length ? { components: { securitySchemes } } : {}),
+    }
+}
+
+
 export function diffLines(oldText = '', newText = '') {
     const a = oldText.split('\n'), b = newText.split('\n')
     if (a.length * b.length > 4_000_000) return null
@@ -512,8 +599,6 @@ export function downloadJson(filename, data) {
     downloadText(filename, JSON.stringify(data, null, 2), 'application/json')
 }
 
-// results: [{ name, pass, elapsed(ms), error? }] — used by both the UI runner
-// ("Export Results") and the CLI headless runner (`consolio run --reporter junit`).
 export function buildJUnitXml(suiteName, results) {
     const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
     const failures = results.filter(r => !r.pass).length
@@ -525,4 +610,3 @@ export function buildJUnitXml(suiteName, results) {
     }).join('\n')
     return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="${esc(suiteName)}" tests="${results.length}" failures="${failures}" time="${totalTime.toFixed(3)}">\n${cases}\n</testsuite>\n`
 }
-

@@ -73,6 +73,7 @@ export function RequestPane() {
 
   const countEnabled = arr => (arr || []).filter(r => r.enabled && r.key).length
 
+  // Compute test badge
   const testBadge = (() => {
     if (!tab.tests?.length) return null
     const r = tab.testResults || []
@@ -88,6 +89,7 @@ export function RequestPane() {
 
   return (
     <div className={styles.wrap}>
+      {/* ── Multi-tab strip ─────────────────────────────────────────────── */}
       <div className={styles.tabStrip}>
         {tabs.map(t => (
           <div
@@ -113,6 +115,7 @@ export function RequestPane() {
         </button>
       </div>
 
+      {/* ── URL bar ─────────────────────────────────────────────────────── */}
       <div className={styles.urlBar}>
         <select
           className={styles.methodSelect}
@@ -194,6 +197,7 @@ export function RequestPane() {
         )}
       </div>
 
+      {/* ── Request sub-tabs ────────────────────────────────────────────── */}
       <div className={styles.reqTabs}>
         {[
           { key: 'info',    label: 'Info',      badge: tab.description ? '●' : null },
@@ -227,6 +231,7 @@ export function RequestPane() {
         )}
       </div>
 
+      {/* ── Panel content ───────────────────────────────────────────────── */}
       <div className={styles.panel}>
         {isGrpc && (
           <GrpcPanel tab={tab} ut={ut} loadGrpcProto={loadGrpcProto} />
@@ -250,6 +255,7 @@ export function RequestPane() {
   )
 }
 
+/* ── Body panel ───────────────────────────────────────────────────────────── */
 function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, environment }) {
   const set = (k, v) => onChange({ ...body, [k]: v })
   const TYPES = ['none', 'json', 'text', 'form', 'multipart', 'raw', 'graphql']
@@ -293,6 +299,7 @@ function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, envi
   )
 }
 
+/* ── GraphQL body editor (query + variables + schema introspection) ─────────── */
 function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
   const set = (k, v) => onChange({ ...body, [k]: v })
   const [loading, setLoading] = useState(false)
@@ -346,6 +353,9 @@ function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
   )
 }
 
+/* ── gRPC panel: paste a .proto, pick a method, fill the request JSON ────────
+   Address goes in the URL bar (host:port). Only unary and server-streaming
+   methods are supported — client-streaming/bidi is rejected server-side.    */
 function GrpcPanel({ tab, ut, loadGrpcProto }) {
   return (
     <div className={styles.graphqlWrap}>
@@ -389,6 +399,7 @@ function GrpcPanel({ tab, ut, loadGrpcProto }) {
   )
 }
 
+/* ── Multipart / form-data table (text fields + file fields) ────────────────── */
 function MultipartTable({ rows, onChange }) {
   const update = (i, patch) => onChange(rows.map((r, j) => j === i ? { ...r, ...patch } : r))
   const del    = i => onChange(rows.filter((_, j) => j !== i))
@@ -398,6 +409,7 @@ function MultipartTable({ rows, onChange }) {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
+      // reader.result is "data:<mime>;base64,<data>" — strip the prefix, keep raw base64.
       const base64 = String(reader.result).split(',')[1] || ''
       update(i, { fileName: file.name, fileType: file.type || 'application/octet-stream', fileSize: file.size, fileData: base64 })
     }
@@ -462,6 +474,8 @@ function MultipartTable({ rows, onChange }) {
   )
 }
 
+/* ── Auth panel ───────────────────────────────────────────────────────────── */
+/* ── Info panel (description + AI-assisted suggestions) ─────────────────────── */
 function InfoPanel({ tab, ut }) {
   const aiApiKey    = useStore(s => s.aiApiKey)
   const showNotif   = useStore(s => s.showNotif)
@@ -549,6 +563,7 @@ function InfoPanel({ tab, ut }) {
   )
 }
 
+/* ── Auth panel ───────────────────────────────────────────────────────────── */
 function AuthPanel({ auth, onChange }) {
   const set = (k, v) => onChange({ ...auth, [k]: v })
   return (
@@ -592,6 +607,7 @@ function AuthPanel({ auth, onChange }) {
   )
 }
 
+/* ── Script panel ─────────────────────────────────────────────────────────── */
 function ScriptPanel({ code, onChange, type, logs }) {
   return (
     <div className={styles.scriptWrap}>
@@ -619,6 +635,7 @@ function ScriptPanel({ code, onChange, type, logs }) {
   )
 }
 
+/* ── Tests panel ──────────────────────────────────────────────────────────── */
 function TestsPanel({ tests, onChange, results }) {
   const add = () => onChange([...(tests || []), { id: uid(), type: 'status', value: '200', path: '' }])
   const upd = (i, f, v) => onChange(tests.map((t, j) => j === i ? { ...t, [f]: v } : t))

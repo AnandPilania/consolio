@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { parse as parseYaml } from 'yaml';
 import {
     parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI,
-    exportPostmanCollection, exportInsomniaCollection, diffLines, buildJUnitXml,
+    exportPostmanCollection, exportInsomniaCollection, exportOpenAPI, diffLines, buildJUnitXml,
     buildCurl, buildHarRequest,
 } from './index.js';
 
@@ -60,9 +60,11 @@ import {
     const postman = {
         info: { name: 'Demo' },
         item: [
-            { name: 'Auth', item: [
-                { name: 'Login', request: { method: 'POST', url: '/login' } },
-            ] },
+            {
+                name: 'Auth', item: [
+                    { name: 'Login', request: { method: 'POST', url: '/login' } },
+                ]
+            },
             { name: 'Ping', request: { method: 'GET', url: '/ping' } },
         ],
     };
@@ -88,9 +90,11 @@ import {
         resources: [
             { _id: 'wrk_1', _type: 'workspace', name: 'Demo' },
             { _id: 'grp_1', _type: 'request_group', name: 'Auth', parentId: 'wrk_1' },
-            { _id: 'req_1', _type: 'request', name: 'Login', method: 'post', url: '/login', parentId: 'grp_1',
-              body: { mimeType: 'application/json', text: '{"u":1}' },
-              authentication: { type: 'bearer', token: 'tok' } },
+            {
+                _id: 'req_1', _type: 'request', name: 'Login', method: 'post', url: '/login', parentId: 'grp_1',
+                body: { mimeType: 'application/json', text: '{"u":1}' },
+                authentication: { type: 'bearer', token: 'tok' }
+            },
         ],
     };
     const col = importInsomniaExport(insomnia);
@@ -134,6 +138,77 @@ paths:
     assert.strictEqual(createPet.url, 'https://api.pets.dev/pets');
     assert.ok(createPet.body.content.includes('Fido'));
     assert.strictEqual(createPet.folderId, col.folders[0].id);
+}
+
+// exportOpenAPI: generates a valid OpenAPI 3.1 doc from a collection, round-trip-compatible
+// with importOpenAPI — path params, tags-from-folders, auth, and body all translate correctly
+{
+    const col = {
+        id: 'col_1', name: 'Pet Store', description: 'A store for pets',
+        folders: [{ id: 'fld_1', name: 'Pets', parentId: null }],
+        requests: [
+            {
+                id: 'req_1', name: 'List pets', description: 'Returns all pets', method: 'GET',
+                url: 'https://api.pets.dev/pets', headers: [], params: [{ key: 'limit', value: '10', enabled: true }],
+                body: { type: 'none' }, auth: { type: 'none' }, folderId: 'fld_1',
+            },
+            {
+                id: 'req_2', name: 'Get pet by id', method: 'GET',
+                url: 'https://api.pets.dev/pets/{{id}}', headers: [], params: [],
+                body: { type: 'none' }, auth: { type: 'bearer', token: '{{TOKEN}}' }, folderId: 'fld_1',
+            },
+            {
+                id: 'req_3', name: 'Create pet', method: 'POST',
+                url: 'https://api.pets.dev/pets', headers: [], params: [],
+                body: { type: 'json', content: '{"name":"Fido"}' }, auth: { type: 'none' }, folderId: 'fld_1',
+            },
+        ],
+    };
+    const spec = exportOpenAPI(col);
+
+    assert.strictEqual(spec.openapi, '3.1.0');
+    assert.strictEqual(spec.info.title, 'Pet Store');
+    assert.strictEqual(spec.info.description, 'A store for pets');
+
+    // List pets: query param present, tagged by folder
+    assert.ok(spec.paths['/pets'].get);
+    assert.strictEqual(spec.paths['/pets'].get.tags[0], 'Pets');
+    assert.strictEqual(spec.paths['/pets'].get.description, 'Returns all pets');
+    assert.ok(spec.paths['/pets'].get.parameters.some(p => p.name === 'limit' && p.in === 'query'));
+
+    // Get pet by id: {{id}} templating converts to OpenAPI {id} path param
+    assert.ok(spec.paths['/pets/{id}'].get);
+    const pathParam = spec.paths['/pets/{id}'].get.parameters.find(p => p.name === 'id');
+    assert.strictEqual(pathParam.in, 'path');
+    assert.strictEqual(pathParam.required, true);
+
+    // Bearer auth produces a security requirement + a securityScheme component
+    assert.deepStrictEqual(spec.paths['/pets/{id}'].get.security, [{ bearerAuth: [] }]);
+    assert.strictEqual(spec.components.securitySchemes.bearerAuth.type, 'http');
+
+    // POST with JSON body: requestBody present with parsed example
+    assert.ok(spec.paths['/pets'].post);
+    const reqBody = spec.paths['/pets'].post.requestBody;
+    assert.deepStrictEqual(reqBody.content['application/json'].example, { name: 'Fido' });
+
+    // Every operation has a responses block (OpenAPI requires at least one)
+    assert.ok(spec.paths['/pets'].get.responses['200']);
+}
+
+// exportOpenAPI: round-trips through importOpenAPI without losing paths or methods
+{
+    const col = {
+        id: 'col_2', name: 'Round Trip', folders: [],
+        requests: [
+            { id: 'r1', name: 'Get widget', method: 'GET', url: 'https://api.example.com/widgets/{{id}}', headers: [], params: [], body: { type: 'none' }, auth: { type: 'none' } },
+            { id: 'r2', name: 'List widgets', method: 'GET', url: 'https://api.example.com/widgets', headers: [], params: [], body: { type: 'none' }, auth: { type: 'none' } },
+        ],
+    };
+    const spec = exportOpenAPI(col);
+    const reimported = importOpenAPI(JSON.stringify(spec), parseYaml);
+    const urls = reimported.requests.map(r => r.method + ' ' + r.url);
+    assert.ok(urls.includes('GET /widgets/{{id}}'));
+    assert.ok(urls.includes('GET /widgets'));
 }
 
 console.log('ui/utils/index.test.js: all checks passed');

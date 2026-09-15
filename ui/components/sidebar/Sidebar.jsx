@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore, apiFetch } from '../../store'
 import { Icon, IconBtn, MethodBadge } from '../shared'
-import { timeAgo, uid, exportPostmanCollection, exportInsomniaCollection, downloadJson } from '../../utils'
+import { timeAgo, uid, exportPostmanCollection, exportInsomniaCollection, exportOpenAPI, downloadJson } from '../../utils'
 import styles from './Sidebar.module.css'
 
 export function Sidebar() {
@@ -20,6 +20,7 @@ export function Sidebar() {
 
   const setSbTab = t => useStore.setState({ sbTab: t })
 
+  // Shared by collection ids and folder ids (col_/fld_ prefixes never collide).
   const toggleCol = id => useStore.setState(s => ({
     expandedCols: { ...s.expandedCols, [id]: !s.expandedCols[id] }
   }))
@@ -77,10 +78,15 @@ export function Sidebar() {
   }
 
   const exportCollection = (col, format) => {
-    const data = format === 'postman' ? exportPostmanCollection(col) : exportInsomniaCollection(col)
+    const data = format === 'postman' ? exportPostmanCollection(col)
+      : format === 'openapi' ? exportOpenAPI(col)
+      : exportInsomniaCollection(col)
     downloadJson(`${(col.name || 'collection').replace(/\s+/g, '_')}.${format}.json`, data)
   }
 
+  // Fetch a readiness score per collection once it has requests — refetches whenever the
+  // collection's request count changes (a rough but cheap staleness signal; exact scores
+  // recompute server-side from live data anyway, this just decides when to re-poll).
   useEffect(() => {
     collections.forEach(col => {
       if (!col.requests?.length) return
@@ -216,7 +222,9 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Content */}
       <div className={styles.content}>
+        {/* Collections */}
         {sbTab === 'collections' && (
           <>
             {collections.length === 0 && (
@@ -257,6 +265,7 @@ export function Sidebar() {
                     <option value="" disabled>Export…</option>
                     <option value="postman">as Postman</option>
                     <option value="insomnia">as Insomnia</option>
+                    <option value="openapi">as OpenAPI 3.1</option>
                   </select>
                   <IconBtn name="plus"   size={11} title="Add request" onClick={e => addRequest(col.id, e)} />
                   <IconBtn name="folder" size={11} title="Add folder"  onClick={e => startCreateFolder(col.id, null, e)} />
@@ -277,6 +286,7 @@ export function Sidebar() {
           </>
         )}
 
+        {/* History */}
         {sbTab === 'history' && (
           <>
             {history.length === 0 && <p className={styles.empty}>No history yet</p>}
@@ -291,6 +301,7 @@ export function Sidebar() {
           </>
         )}
 
+        {/* Interceptor */}
         {sbTab === 'interceptor' && (
           <InterceptorPane intercepted={intercepted} onLoad={loadIntercepted} />
         )}
@@ -299,6 +310,7 @@ export function Sidebar() {
   )
 }
 
+/* ── Status chip ──────────────────────────────────────────────────────────── */
 function StatusChip({ status }) {
   const cls = !status      ? ''
     : status < 300         ? styles.s2xx
@@ -308,6 +320,7 @@ function StatusChip({ status }) {
   return <span className={`${styles.statusChip} ${cls}`}>{status || '—'}</span>
 }
 
+/* ── Interceptor pane ─────────────────────────────────────────────────────── */
 function InterceptorPane({ intercepted, onLoad }) {
   const filterMode   = useStore(s => s.interceptorFilterMode)
   const filters      = useStore(s => s.interceptorFilters)
@@ -318,6 +331,7 @@ function InterceptorPane({ intercepted, onLoad }) {
 
   return (
     <div className={styles.interceptor}>
+      {/* Mode toggle + filter rules */}
       <div className={styles.filterHeader}>
         <Icon name="filter" size={12} style={{ color: 'var(--accent)' }} />
         <span className={styles.filterTitle}>Filter rules</span>
@@ -393,6 +407,7 @@ function InterceptorPane({ intercepted, onLoad }) {
         </button>
       </div>
 
+      {/* Captured list */}
       <div className={styles.interceptDivider}>
         Captured ({intercepted.length})
       </div>

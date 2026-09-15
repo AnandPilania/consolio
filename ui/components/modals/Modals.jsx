@@ -4,6 +4,7 @@ import { Icon, IconBtn, Btn, FormGroup, Input, Select, Spinner, MethodBadge, KVT
 import { parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI, uid, fmtTime, timeAgo, buildHarRequest, GENERATE_TARGETS, downloadJson, downloadText, buildJUnitXml } from '../../utils'
 import styles from './Modals.module.css'
 
+/* ── Modal shell ──────────────────────────────────────────────────────────── */
 function Modal({ title, icon, onClose, children, footer, wide }) {
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -20,6 +21,7 @@ function Modal({ title, icon, onClose, children, footer, wide }) {
   )
 }
 
+/* ── New Collection ───────────────────────────────────────────────────────── */
 export function NewCollectionModal() {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
@@ -53,6 +55,9 @@ export function NewCollectionModal() {
   )
 }
 
+/* ── Import ───────────────────────────────────────────────────────────────── */
+// Creates the collection, then its folders (sequentially, so client-temp folder
+// ids can be remapped to server-assigned ids), then bulk-creates the requests.
 async function createCollectionFromImport(imported, description) {
   const col = await apiFetch('/api/collections', { method: 'POST', body: { name: imported.name, description } })
   const idMap = {}
@@ -62,7 +67,10 @@ async function createCollectionFromImport(imported, description) {
     })
     idMap[f.id] = created.id
   }
-  const requests = imported.requests.map(r => ({ ...r, folderId: idMap[r.folderId] || null }))
+  const requests = imported.requests.map(r => {
+    const { _discoveredParams, ...clean } = r
+    return { ...clean, folderId: idMap[r.folderId] || null }
+  })
   if (requests.length) {
     await apiFetch(`/api/collections/${col.id}/requests/bulk`, { method: 'POST', body: { requests } })
   }
@@ -75,14 +83,39 @@ const IMPORT_TABS = [
   ['postman',  'Postman Collection'],
   ['insomnia', 'Insomnia Export'],
   ['openapi',  'OpenAPI / Swagger'],
+  ['scan',     'Scan Codebase'],
 ]
 
 export function ImportModal() {
   const [tab,   setTab]   = useState('curl')
   const [text,  setText]  = useState('')
   const [error, setError] = useState('')
+  const [scanPath, setScanPath] = useState('')
+  const [scanBaseUrl, setScanBaseUrl] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [scanResult, setScanResult] = useState(null)
   const showNotif = useStore(s => s.showNotif)
   const close = () => useStore.setState({ modal: null })
+
+  const doScan = async () => {
+    setError('')
+    setScanResult(null)
+    setScanning(true)
+    try {
+      const result = await apiFetch('/api/scan/routes', { method: 'POST', body: { path: scanPath || undefined, baseUrl: scanBaseUrl } })
+      if (result.error) throw new Error(result.error)
+      if (!result.requests.length) throw new Error('No routes found — check the path, or this framework style may not be supported yet (Express, Fastify, and NestJS route decorators are supported).')
+      setScanResult(result)
+    } catch (e) { setError(e.message) }
+    setScanning(false)
+  }
+
+  const confirmScanImport = async () => {
+    if (!scanResult) return
+    const count = await createCollectionFromImport(scanResult, scanResult.description)
+    showNotif(`Imported ${count} discovered routes`, 'success')
+    close()
+  }
 
   const doImport = async () => {
     setError('')
@@ -129,6 +162,7 @@ export function ImportModal() {
     postman:  'Paste the full contents of an exported Postman collection JSON file. Folders are preserved.',
     insomnia: 'Paste the full contents of an Insomnia v4 export (Export → resources). Folders are preserved.',
     openapi:  'Paste an OpenAPI/Swagger 3.x document (JSON or YAML). Requests are grouped into folders by tag.',
+    scan:     'Statically scans this project\'s source files for Express, Fastify, and NestJS route definitions — no OpenAPI spec required. Read-only; nothing is executed.',
   }
   const placeholders = {
     curl: "curl -X POST 'https://api.example.com/users' \\\n  -H 'Authorization: Bearer token' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"John\"}'",
@@ -137,11 +171,19 @@ export function ImportModal() {
     openapi: 'openapi: 3.0.0\ninfo:\n  title: My API\npaths:\n  /users:\n    get: ...',
   }
 
+  const footer = tab === 'scan'
+    ? (
+      <>
+        <Btn variant="ghost" onClick={close}>Cancel</Btn>
+        {!scanResult
+          ? <Btn variant="primary" onClick={doScan} disabled={scanning}>{scanning ? <Spinner size={12} /> : 'Scan'}</Btn>
+          : <Btn variant="primary" onClick={confirmScanImport}>Import {scanResult.requests.length} route{scanResult.requests.length === 1 ? '' : 's'}</Btn>}
+      </>
+    )
+    : <><Btn variant="ghost" onClick={close}>Cancel</Btn><Btn variant="primary" onClick={doImport}>Import</Btn></>
+
   return (
-    <Modal
-      title="Import" icon="upload" onClose={close}
-      footer={<><Btn variant="ghost" onClick={close}>Cancel</Btn><Btn variant="primary" onClick={doImport}>Import</Btn></>}
-    >
+    <Modal title="Import" icon="upload" onClose={close} footer={footer}>
       <div className={styles.importTabs}>
         {IMPORT_TABS.map(([key, label]) => (
           <button key={key} className={`${styles.importTab} ${tab === key ? styles.importTabActive : ''}`} onClick={() => setTab(key)}>
@@ -150,17 +192,41 @@ export function ImportModal() {
         ))}
       </div>
       <p className={styles.importHint}>{hints[tab]}</p>
-      <textarea
-        className={styles.importArea}
-        placeholder={placeholders[tab]}
-        value={text}
-        onChange={e => setText(e.target.value)}
-      />
+
+      {tab === 'scan' ? (
+        <div className={styles.scanForm}>
+          <FormGroup label="Subdirectory (optional — defaults to the whole project)">
+            <Input value={scanPath} onChange={e => setScanPath(e.target.value)} placeholder="src/routes" />
+          </FormGroup>
+          <FormGroup label="Base URL (optional — prefixed onto every discovered path)">
+            <Input value={scanBaseUrl} onChange={e => setScanBaseUrl(e.target.value)} placeholder="http://localhost:3000" />
+          </FormGroup>
+          {scanResult && (
+            <div className={styles.scanResults}>
+              <p className={styles.scanResultsHeader}>{scanResult.description}</p>
+              {scanResult.requests.map(r => (
+                <div key={r.id} className={styles.scanResultRow}>
+                  <MethodBadge method={r.method} small />
+                  <span className={styles.scanResultUrl}>{r.url}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <textarea
+          className={styles.importArea}
+          placeholder={placeholders[tab]}
+          value={text}
+          onChange={e => setText(e.target.value)}
+        />
+      )}
       {error && <div className={styles.importError}>{error}</div>}
     </Modal>
   )
 }
 
+/* ── Code generation ──────────────────────────────────────────────────────── */
 export function CodeGenModal() {
   const tabs         = useStore(s => s.tabs)
   const activeTabId  = useStore(s => s.activeTabId)
@@ -222,6 +288,7 @@ export function CodeGenModal() {
   )
 }
 
+/* ── Collection Runner ────────────────────────────────────────────────────── */
 export function RunnerModal() {
   const collections = useStore(s => s.collections)
   const environments = useStore(s => s.environments)
@@ -388,6 +455,7 @@ export function RunnerModal() {
   )
 }
 
+/* ── Settings ─────────────────────────────────────────────────────────────── */
 export function SettingsModal() {
   const config       = useStore(s => s.config)
   const environments = useStore(s => s.environments)
@@ -445,6 +513,7 @@ export function SettingsModal() {
     <Modal title="Settings" icon="settings" onClose={close} wide footer={
       <><Btn variant="ghost" onClick={close}>Cancel</Btn><Btn variant="primary" onClick={saveSettings}>Save Settings</Btn></>
     }>
+      {/* ── Project ─────────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Project</h3>
         <div className={styles.settingsGrid}>
@@ -495,6 +564,7 @@ export function SettingsModal() {
         </div>
       </section>
 
+      {/* ── AI Assist ───────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>AI Assist</h3>
         <div className={styles.settingsGrid}>
@@ -515,6 +585,7 @@ export function SettingsModal() {
         </p>
       </section>
 
+      {/* ── Environments ────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>Environments</h3>
@@ -540,6 +611,7 @@ export function SettingsModal() {
           {environments.length === 0 && <p className={styles.noEnvs}>No environments yet</p>}
         </div>
 
+        {/* Inline editor */}
         {envEdit && (
           <div className={styles.envEditor}>
             <div className={styles.envEditorTitle}>
@@ -610,6 +682,7 @@ export function SettingsModal() {
         )}
       </section>
 
+      {/* ── Browser interceptor hint ─────────────────────────────────────── */}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Browser Interceptor</h3>
         <div className={styles.interceptorHint}>
@@ -623,6 +696,7 @@ export function SettingsModal() {
   )
 }
 
+/* ── Plugin manager ───────────────────────────────────────────────────────── */
 export function PluginManagerModal() {
   const showNotif = useStore(s => s.showNotif)
   const close = () => useStore.setState({ modal: null })
@@ -741,6 +815,7 @@ export function PluginManagerModal() {
   )
 }
 
+/* ── Mock servers ─────────────────────────────────────────────────────────── */
 export function MockManagerModal() {
   const showNotif = useStore(s => s.showNotif)
   const close = () => useStore.setState({ modal: null })
@@ -880,6 +955,7 @@ export function MockManagerModal() {
   )
 }
 
+/* ── Dashboard (Elva-style call analytics + readiness score) ────────────────── */
 export function DashboardModal() {
   const collections = useStore(s => s.collections)
   const modalData    = useStore(s => s.modalData)
@@ -888,20 +964,30 @@ export function DashboardModal() {
   const [collectionId, setCollectionId] = useState(modalData?.collectionId || '')
   const [analytics, setAnalytics] = useState(null)
   const [score, setScore] = useState(null)
+  const [mcpManifest, setMcpManifest] = useState(null)
+  const [showMcpConfig, setShowMcpConfig] = useState(false)
   const [loading, setLoading] = useState(true)
+  const showNotif = useStore(s => s.showNotif)
 
   const load = async () => {
     setLoading(true)
     try {
       const qs = collectionId ? `?collectionId=${collectionId}` : ''
-      const [a, s] = await Promise.all([
+      const [a, s, m] = await Promise.all([
         apiFetch(`/api/history/analytics${qs}`),
         collectionId ? apiFetch(`/api/collections/${collectionId}/score`) : Promise.resolve(null),
+        collectionId ? apiFetch(`/api/collections/${collectionId}/mcp-manifest`) : Promise.resolve(null),
       ])
       setAnalytics(a)
       setScore(s)
+      setMcpManifest(m)
     } catch { }
     setLoading(false)
+  }
+
+  const copyMcpConfig = () => {
+    navigator.clipboard.writeText(JSON.stringify(mcpManifest.configSnippet, null, 2))
+    showNotif('MCP config copied to clipboard', 'success')
   }
 
   useEffect(() => { load() }, [collectionId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -936,6 +1022,42 @@ export function DashboardModal() {
               />
             )}
           </div>
+
+          {mcpManifest?.tools?.length > 0 && (
+            <>
+              <div className={styles.mcpSectionHeader}>
+                <h3 className={styles.sectionTitle} style={{ margin: 0 }}>MCP Server</h3>
+                <Btn variant="ghost" size="sm" onClick={() => setShowMcpConfig(v => !v)}>
+                  <Icon name="sparkle" size={11} /> {showMcpConfig ? 'Hide' : 'Generate'} config
+                </Btn>
+              </div>
+              <p className={styles.settingsHint} style={{ margin: '4px 0 8px' }}>
+                This collection can be served as an MCP server — each request becomes a tool an AI agent can call directly.
+              </p>
+              <div className={styles.mockList} style={{ width: 'auto' }}>
+                {mcpManifest.tools.map(t => (
+                  <div key={t.name} className={styles.mockRow} style={{ cursor: 'default' }}>
+                    <MethodBadge method={t.method || 'GET'} small />
+                    <div className={styles.mockInfo}>
+                      <span className={styles.mockName}>{t.name}</span>
+                      <span className={styles.mockMeta}>{t.url}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showMcpConfig && (
+                <div className={styles.mcpConfigBox}>
+                  <p className={styles.settingsHint} style={{ margin: '0 0 8px' }}>
+                    Add this to your MCP client's config (e.g. Claude Desktop's <code>claude_desktop_config.json</code>):
+                  </p>
+                  <pre className={styles.mcpConfigCode}>{JSON.stringify(mcpManifest.configSnippet, null, 2)}</pre>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <Btn variant="primary" size="sm" onClick={copyMcpConfig}>Copy config</Btn>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           {score?.topIssues?.length > 0 && (
             <>
