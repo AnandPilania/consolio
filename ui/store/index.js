@@ -113,10 +113,8 @@ export const useStore = create(
             /* Notification */
             notif: null,
 
-            /* AI-assisted fixes — bring-your-own-key, kept client-side only (never sent
-               to the server except as part of an explicit ai-suggest request). */
-            aiApiKey: '',
-            setAiApiKey: (key) => set({ aiApiKey: key }),
+            aiConfig: { provider: 'anthropic', apiKey: '', model: '', baseUrl: '' },
+            setAiConfig: (patch) => set(s => ({ aiConfig: { ...s.aiConfig, ...patch } })),
 
             /* ── Computed helpers ──────────────────────────────────────────────── */
             getActiveTab() {
@@ -530,7 +528,7 @@ export const useStore = create(
                 interceptorFilters: s.interceptorFilters,
                 activeEnvId: s.activeEnvId,
                 expandedCols: s.expandedCols,
-                aiApiKey: s.aiApiKey,
+                aiConfig: s.aiConfig,
             }),
             // Merge persisted panels with DEFAULT_PANELS so any missing fields
             // (e.g. from an older saved schema) are always filled in safely.

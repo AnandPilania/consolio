@@ -33,6 +33,7 @@ const PATHS = {
   shield:    'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   barChart:  'M12 20V10M18 20V4M6 20v-4',
   sparkle:   'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 3v3M20.5 4.5h-3M5 17v2M6 18H4',
+  edit:      'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
 }
 
 export function Icon({ name, size = 14, className, style }) {

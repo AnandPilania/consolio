@@ -268,6 +268,7 @@ export function Sidebar() {
                     <option value="openapi">as OpenAPI 3.1</option>
                   </select>
                   <IconBtn name="plus"   size={11} title="Add request" onClick={e => addRequest(col.id, e)} />
+                  <IconBtn name="shield" size={11} title="Audience profiles" onClick={e => { e.stopPropagation(); useStore.setState({ modal: 'profiles', modalData: { collectionId: col.id } }) }} />
                   <IconBtn name="folder" size={11} title="Add folder"  onClick={e => startCreateFolder(col.id, null, e)} />
                   <IconBtn name="trash"  size={11} title="Delete collection" onClick={e => deleteCollection(col.id, e)} className={styles.danger} />
                 </div>

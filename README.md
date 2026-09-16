@@ -4,7 +4,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/@pilaniaanand/consolio.svg)](package.json)
 
-> Lightweight, project-isolated API testing tool — a fast Postman/Insomnia alternative. Runs as `npx` — no install needed. ~30MB RAM.
+> Lightweight, project-isolated API testing tool — a fast Postman/Insomnia alternative, with API-readiness scoring, call analytics, code-based route discovery, and one-command MCP server generation for agentic workflows. Runs as `npx` — no install needed. ~30MB RAM.
 
 ## Table of contents
 
@@ -17,7 +17,14 @@
   - [Auth types](#auth-types)
   - [Body types](#body-types)
   - [Import / Export](#import--export)
+  - [Discover routes from code](#discover-routes-from-code)
   - [Generate code](#generate-code)
+- [API readiness score](#api-readiness-score)
+- [Dashboard & call analytics](#dashboard--call-analytics)
+- [AI-assisted fixes](#ai-assisted-fixes)
+- [MCP server generation](#mcp-server-generation)
+- [Audience profiles](#audience-profiles)
+- [Breaking-change diff](#breaking-change-diff)
 - [Testing requests](#testing-requests)
   - [Assertion types](#assertion-types)
   - [Pre/post request scripts](#prepost-request-scripts)
@@ -38,7 +45,13 @@
 - **Zero install** — `npx @pilaniaanand/consolio` and go; ~30MB RAM footprint
 - **Project-isolated** collections — `.consolio/` lives next to your code and commits to git like any other file
 - Nested folders, bulk import, and a full **collection runner** with pre/post-request scripts and test assertions — in the UI and as a **headless CLI** (`consolio run`, JUnit/JSON reporters for CI)
-- Import cURL, **Postman v2.1**, **Insomnia v4**, and **OpenAPI/Swagger 3.x**; export to Postman or Insomnia format
+- Import cURL, **Postman v2.1**, **Insomnia v4**, and **OpenAPI/Swagger 3.x**; **discover routes directly from an Express/Fastify/NestJS codebase** with no spec required; export to Postman, Insomnia, or **OpenAPI 3.1**
+- **API readiness scoring** — an A–F grade per collection from missing descriptions, undeclared auth, missing tests, and other DX/agent-readiness checks, with a rollup of the most common issues
+- **Dashboard & call analytics** — latency percentiles, error rates, and a per-request breakdown across everything sent through consolio, UI or MCP
+- **AI-assisted fixes** (provider-agnostic — Anthropic, OpenAI, Azure OpenAI, Ollama, or any OpenAI-compatible endpoint) — one click to suggest a missing description and test assertions for a request
+- **Generate an MCP server from any collection** — every request becomes a Model Context Protocol tool an agent (Claude Desktop, Cursor, etc.) can call directly, over stdio, with secrets never exposed to the agent
+- **Audience profiles** — scope a collection to a subset of requests (with chosen headers/params redacted) for exporting or generating an MCP server for a specific audience
+- **Breaking-change diff** — compare a fresh re-import or re-scan against an existing collection to catch removed endpoints/params/auth before they surprise a consumer
 - **Multi-language code generation** (cURL, JS, Node, Python, Go, Java, PHP, Ruby) via `httpsnippet`
 - Response preview with a collapsible **JSON tree**, raw view, and a **diff** against the previous history entry
 - First-class protocol support beyond plain HTTP: **GraphQL**, **WebSocket**, **Server-Sent Events**, **Socket.IO**, **gRPC**
@@ -74,6 +87,9 @@ consolio --help
 | `start` (default) | `-p, --port <port>` (default `4242`)<br>`--no-open` — don't auto-open the browser<br>`--dev` — API-only mode for use alongside Vite HMR<br>`--project <path>` — project directory (default: cwd) | Start the consolio server |
 | `init` | `--name <name>` (default `"My Project"`) | Create `.consolio/` in the current directory |
 | `run <collection>` | `-e, --env <name>` — environment id or name<br>`-r, --reporter <type>` — `cli` \| `json` \| `junit` (default `cli`)<br>`-c, --concurrency <n>` — requests in parallel (default `1`)<br>`-d, --delay <ms>` — delay between batches (default `0`)<br>`--bail` — stop on first failing request<br>`--project <path>` — project directory (default: cwd) | Run a collection headlessly, no browser needed |
+| `scan` | `--project <path>` — project directory to scan (default: cwd)<br>`--path <subpath>` — subdirectory to scan instead of the whole project<br>`--base-url <url>` — prefix onto every discovered path<br>`-o, --out <file>` — write the discovered collection as JSON instead of printing a summary | Statically discover Express/Fastify/NestJS routes — no OpenAPI spec needed |
+| `mcp generate <collection>` | `-e, --env <name>` — environment id or name (affects which vars are treated as secret)<br>`--project <path>` — project directory<br>`-o, --out <file>` — write the tool manifest as JSON | Preview the MCP tool manifest a collection would expose, without starting a server |
+| `mcp serve <collection>` | `-e, --env <name>` — environment id or name, supplies `{{variables}}` and secrets<br>`--project <path>` — project directory | Serve a collection as an MCP server over stdio (for Claude Desktop, Cursor, etc.) |
 
 ```bash
 consolio start --port 8080 --no-open
@@ -81,6 +97,9 @@ consolio init --name "My API"
 consolio run "My Collection" --env Staging --reporter cli
 consolio run col_abc123 --concurrency 4 --bail
 consolio run "My Collection" --reporter junit > results.xml
+consolio scan --project ./server --base-url http://localhost:3000
+consolio mcp generate "My Collection"
+consolio mcp serve "My Collection" --env Production
 ```
 
 `run` exits `1` if any request failed, `2` if the collection/environment wasn't found — suitable for CI pipelines.
@@ -117,21 +136,140 @@ Set under the **Body** tab: **JSON**, **Text**, **Form** (`application/x-www-for
 ### Import / Export
 
 Import (toolbar → upload icon): cURL commands, Postman Collection v2.1 JSON, Insomnia v4 export JSON,
-or an OpenAPI/Swagger 3.x document (JSON or YAML) — paths/methods become requests, tags become folders.
-Postman/Insomnia folder structure is preserved on import.
+an OpenAPI/Swagger 3.x document (JSON or YAML), or **scan a codebase directly** (see
+[Discover routes from code](#discover-routes-from-code) below) — paths/methods become requests, tags
+(or source files, for a scan) become folders. Postman/Insomnia folder structure is preserved on import.
 
-Export (collection header → "Export…"): download the collection as Postman Collection v2.1 JSON or
-an Insomnia v4 export file.
+Export (collection header → "Export…"): download the collection as Postman Collection v2.1 JSON,
+an Insomnia v4 export file, or an **OpenAPI 3.1** document — folders become tags, `{{var}}` path
+templating converts to OpenAPI's `{var}` style, and auth/body are translated into `security` /
+`requestBody` where possible. This is meant to give a spec a useful starting point, not guarantee a
+byte-perfect document — schemas are inferred loosely (`object`/`string`) since consolio doesn't store
+JSON Schema for request/response shapes.
 
 Environment variables can be flagged **secret** (masked with a password-style input in the UI, and
 excluded from generated code snippets). This is a display/export-time convenience, not an encryption
 layer — secret values are still resolved in plain text when a request executes and are stored in
-request history like any other variable.
+request history like any other variable. Secret variables are also the ones excluded from an
+[MCP server](#mcp-server-generation)'s tool input schema, so an agent is never asked to supply them.
+
+### Discover routes from code
+
+Import → **Scan Codebase** tab (or `consolio scan` on the CLI) statically scans a project's source
+files for Express, Fastify (both call-style `app.get(...)` and object-style `fastify.route({...})`),
+and NestJS decorator-based routes — no OpenAPI spec required. It's a regex-based scan, not a full AST
+parse, so it's a good way to bootstrap a starting collection from hand-written route files; it won't
+catch highly dynamic route registration (routes assembled in a loop or from variables). `:param` path
+segments are templated to `{{param}}` automatically. Discovered requests are grouped into folders by
+source file and de-duplicated by method + path.
+
+```bash
+consolio scan --project ./server                       # print a summary
+consolio scan --project ./server -o routes.json         # write the discovered collection to a file
+consolio scan --path src/routes --base-url http://localhost:3000
+```
 
 ### Generate code
 
 Request toolbar → code icon (next to "Copy as cURL") — generates a runnable snippet for the current
 request in cURL, JavaScript (fetch/axios), Node.js, Python (requests), Go, Java (OkHttp), PHP, or Ruby.
+
+## API readiness score
+
+Every collection gets an A–F grade (sidebar → grade chip next to the request count, or the Dashboard),
+computed from seven weighted checks per request: has a description, declares an auth type, has at
+least one test assertion, includes a status-code test specifically, has a real (non-default) name,
+documents its headers/query params, and doesn't have an obviously hardcoded secret in the URL or
+headers. The Dashboard's "Top issues" list rolls up the most common failing checks across the
+collection (e.g. "12 requests missing descriptions") so you know what to fix first. Nothing here makes
+a network call — it's computed entirely from what's already stored.
+
+## Dashboard & call analytics
+
+Topbar → bar-chart icon (or click a collection's grade chip). Scope to one collection or view
+everything, and see total requests, average/p95 latency, error rate, a per-request breakdown, and a
+list of recent errors. This includes **every** request sent through consolio — the UI, the CLI runner,
+and any [MCP server](#mcp-server-generation) generated from a collection all log to the same history,
+so agent call traffic shows up here automatically alongside your own testing.
+
+## AI-assisted fixes
+
+A request's **Info** tab has a description field and a "Fix with AI" button. This is opt-in and
+**provider-agnostic, bring-your-own-endpoint** (Settings → AI Assist) — consolio never ships a bundled
+key, model, or endpoint, and never calls out unless you've configured a provider and clicked the button.
+Supported providers:
+
+| Provider | Needs | Notes |
+| --- | --- | --- |
+| **Anthropic** | API key | Model defaults to `claude-sonnet-4-6` if left blank |
+| **OpenAI** | API key, model | e.g. `gpt-4o-mini` |
+| **Azure OpenAI** | API key, base URL, model | Base URL is the full deployment URL, e.g. `https://<resource>.openai.azure.com/openai/deployments/<deployment>`; model is your deployment name |
+| **Ollama** | Model | Local by default (`http://localhost:11434`) or point Base URL at a remote/cloud Ollama instance; no API key needed |
+| **Other (OpenAI-compatible)** | Base URL, model | Any server that speaks the OpenAI Chat Completions shape — vLLM, LM Studio, OpenRouter, Ollama's own `/v1` endpoint, etc.; API key optional |
+
+Clicking the button sends the request's method, URL, declared headers/params, and a truncated preview
+of its last response to whichever provider you've configured, and proposes a one-sentence description
+plus 1–3 test assertions. Nothing is written until you click **Apply** — the suggestion is always a
+proposal, never an automatic edit. Provider settings are stored only in the browser's local storage and
+sent only when you click "Fix with AI" — never saved to the project or to consolio's own storage.
+
+## MCP server generation
+
+Turn any collection into a [Model Context Protocol](https://modelcontextprotocol.io) server — every
+request becomes an MCP tool an agent (Claude Desktop, Cursor, or anything else that speaks MCP) can
+call directly.
+
+```bash
+consolio mcp generate "My Collection"          # preview the tools this would expose
+consolio mcp serve "My Collection" --env Production
+```
+
+`mcp serve` starts a local stdio server — the standard transport MCP clients spawn as a subprocess, so
+there's no cloud hosting or gateway involved. Point a client at it directly, e.g. in
+`claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "consolio-my-collection": {
+      "command": "npx",
+      "args": ["consolio", "mcp", "serve", "My Collection", "--project", "/path/to/project"]
+    }
+  }
+}
+```
+
+The Dashboard's **MCP Server** section (when a collection is selected) shows the exact tool list and a
+"Generate config" button that produces this snippet ready to copy.
+
+A tool's input schema is derived from every `{{var}}` placeholder in the request's URL, headers, body,
+and auth, plus its declared query params — an agent calling the tool supplies these as arguments.
+Environment variables flagged **secret** are never included in a tool's input schema; they're resolved
+server-side from the chosen environment (`--env`) instead, so an agent can call an authenticated
+endpoint without ever seeing the credential. Tool calls run through the exact same execution pipeline
+as the UI and CLI runner — pre/post scripts, test assertions, and history logging all apply — so agent
+traffic is indistinguishable from your own testing except in the [Dashboard](#dashboard--call-analytics),
+where it's clearly attributed back to the request that made it.
+
+## Audience profiles
+
+A **profile** (collection header → shield icon) scopes a collection to a subset of requests for a
+given audience — public docs, a partner integration, an internal-only client, an AI agent — without
+duplicating the collection. Pick **allowlist** (only checked requests are included) or **blocklist**
+(everything except checked requests), and optionally list header/param names to strip from every
+visible request (e.g. redact `X-Admin-Token` and `debug` for an external-facing profile). Applying a
+profile never modifies the underlying collection — it produces a filtered copy on demand, which the
+existing Postman/Insomnia/OpenAPI exporters (and MCP server generation) consume directly, so scoping
+per audience needed no separate export machinery.
+
+## Breaking-change diff
+
+Before applying a fresh re-import (a new OpenAPI spec, or a fresh [codebase scan](#discover-routes-from-code)),
+diff it against what's already in the collection to catch surprises: removed endpoints, removed
+query params or headers on an endpoint that's still there, and changes to auth type or body type.
+URLs are normalized (host and query string ignored) so re-importing from a different base URL doesn't
+produce false positives. The diff never applies anything on its own — it's a report to review before
+you decide to overwrite.
 
 ## Testing requests
 

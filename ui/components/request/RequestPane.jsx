@@ -477,13 +477,20 @@ function MultipartTable({ rows, onChange }) {
 /* ── Auth panel ───────────────────────────────────────────────────────────── */
 /* ── Info panel (description + AI-assisted suggestions) ─────────────────────── */
 function InfoPanel({ tab, ut }) {
-  const aiApiKey    = useStore(s => s.aiApiKey)
+  const aiConfig    = useStore(s => s.aiConfig)
   const showNotif   = useStore(s => s.showNotif)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState(null) // { description, tests } | null
   const [error, setError] = useState('')
 
-  const canSuggest = Boolean(tab.activeReq && aiApiKey)
+  const isConfigured = Boolean(
+    aiConfig.provider === 'ollama'
+      ? aiConfig.model
+      : aiConfig.provider === 'anthropic'
+        ? aiConfig.apiKey
+        : aiConfig.apiKey || aiConfig.provider === 'openai-compatible'
+  )
+  const canSuggest = Boolean(tab.activeReq && isConfigured)
 
   const requestSuggestion = async () => {
     setError('')
@@ -492,7 +499,7 @@ function InfoPanel({ tab, ut }) {
     try {
       const res = await apiFetch(
         `/api/collections/${tab.activeReq.colId}/requests/${tab.activeReq.reqId}/ai-suggest`,
-        { method: 'POST', body: { apiKey: aiApiKey } }
+        { method: 'POST', body: aiConfig }
       )
       if (res.error) throw new Error(res.error)
       setSuggestion(res)
@@ -532,9 +539,9 @@ function InfoPanel({ tab, ut }) {
           {suggesting ? <Spinner size={12} /> : <><Icon name="sparkle" size={12} /> Fix with AI</>}
         </Btn>
         {!tab.activeReq && <span className={styles.scriptHint}>Save this request to a collection first.</span>}
-        {tab.activeReq && !aiApiKey && (
+        {tab.activeReq && !isConfigured && (
           <span className={styles.scriptHint}>
-            Add an API key in <button className={styles.aiSettingsLink} onClick={() => useStore.setState({ modal: 'settings' })}>Settings</button> to enable AI suggestions.
+            Set up a provider in <button className={styles.aiSettingsLink} onClick={() => useStore.setState({ modal: 'settings' })}>Settings</button> to enable AI suggestions.
           </span>
         )}
       </div>

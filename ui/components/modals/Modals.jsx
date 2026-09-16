@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore, apiFetch } from '../../store'
 import { Icon, IconBtn, Btn, FormGroup, Input, Select, Spinner, MethodBadge, KVTable } from '../shared'
-import { parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI, uid, fmtTime, timeAgo, buildHarRequest, GENERATE_TARGETS, downloadJson, downloadText, buildJUnitXml } from '../../utils'
+import { parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI, exportPostmanCollection, exportInsomniaCollection, exportOpenAPI, uid, fmtTime, timeAgo, buildHarRequest, GENERATE_TARGETS, downloadJson, downloadText, buildJUnitXml } from '../../utils'
 import styles from './Modals.module.css'
 
 /* ── Modal shell ──────────────────────────────────────────────────────────── */
@@ -461,8 +461,8 @@ export function SettingsModal() {
   const environments = useStore(s => s.environments)
   const activeEnvId  = useStore(s => s.activeEnvId)
   const showNotif    = useStore(s => s.showNotif)
-  const aiApiKey     = useStore(s => s.aiApiKey)
-  const setAiApiKey  = useStore(s => s.setAiApiKey)
+  const aiConfig     = useStore(s => s.aiConfig)
+  const setAiConfig  = useStore(s => s.setAiConfig)
   const close = () => useStore.setState({ modal: null })
 
   const [form,    setForm]    = useState({ ...config })
@@ -568,18 +568,68 @@ export function SettingsModal() {
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>AI Assist</h3>
         <div className={styles.settingsGrid}>
-          <FormGroup label="Anthropic API key">
+          <FormGroup label="Provider">
+            <Select value={aiConfig.provider} onChange={e => setAiConfig({ provider: e.target.value })}>
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="azure-openai">Azure OpenAI</option>
+              <option value="ollama">Ollama (local or remote)</option>
+              <option value="openai-compatible">Other (OpenAI-compatible endpoint)</option>
+            </Select>
+          </FormGroup>
+
+          {aiConfig.provider !== 'ollama' && (
+            <FormGroup label={aiConfig.provider === 'azure-openai' ? 'API key' : 'API key' + (aiConfig.provider === 'openai-compatible' ? ' (optional)' : '')}>
+              <Input
+                type="password"
+                value={aiConfig.apiKey}
+                onChange={e => setAiConfig({ apiKey: e.target.value })}
+                placeholder={aiConfig.provider === 'anthropic' ? 'sk-ant-…' : aiConfig.provider === 'openai' ? 'sk-…' : 'API key'}
+              />
+            </FormGroup>
+          )}
+
+          {(aiConfig.provider === 'azure-openai' || aiConfig.provider === 'openai-compatible') && (
+            <FormGroup label="Base URL">
+              <Input
+                value={aiConfig.baseUrl}
+                onChange={e => setAiConfig({ baseUrl: e.target.value })}
+                placeholder={aiConfig.provider === 'azure-openai'
+                  ? 'https://<resource>.openai.azure.com/openai/deployments/<deployment>'
+                  : 'http://localhost:11434/v1'}
+              />
+            </FormGroup>
+          )}
+
+          {aiConfig.provider === 'ollama' && (
+            <FormGroup label="Base URL (optional)">
+              <Input
+                value={aiConfig.baseUrl}
+                onChange={e => setAiConfig({ baseUrl: e.target.value })}
+                placeholder="http://localhost:11434 (default)"
+              />
+            </FormGroup>
+          )}
+
+          <FormGroup label={aiConfig.provider === 'anthropic' ? 'Model (optional)' : 'Model'}>
             <Input
-              type="password"
-              value={aiApiKey}
-              onChange={e => setAiApiKey(e.target.value)}
-              placeholder="sk-ant-…"
+              value={aiConfig.model}
+              onChange={e => setAiConfig({ model: e.target.value })}
+              placeholder={
+                aiConfig.provider === 'anthropic' ? 'claude-sonnet-4-6 (default)'
+                : aiConfig.provider === 'openai' ? 'gpt-4o-mini'
+                : aiConfig.provider === 'azure-openai' ? 'your deployment name'
+                : aiConfig.provider === 'ollama' ? 'llama3.1'
+                : 'model name'
+              }
             />
           </FormGroup>
         </div>
         <p className={styles.settingsHint}>
           Powers the "Fix with AI" button on a request's Info tab, which suggests a
-          description and test assertions. Bring-your-own-key — stored only in this
+          description and test assertions. Bring-your-own-endpoint — works with Anthropic,
+          OpenAI, Azure OpenAI, a local or remote Ollama instance, or any other
+          OpenAI-Chat-Completions-compatible server. Settings are stored only in this
           browser's local storage, sent only when you click that button, and never
           saved to the project or to consolio's own storage.
         </p>
@@ -1120,6 +1170,176 @@ function DashStat({ label, value, tone }) {
     <div className={styles.dashStat}>
       <span className={styles.dashStatValue} style={{ color }}>{value}</span>
       <span className={styles.dashStatLabel}>{label}</span>
+    </div>
+  )
+}
+
+/* ── Audience profiles (Elva Contracts-lite) ─────────────────────────────────── */
+export function ProfilesModal() {
+  const collections = useStore(s => s.collections)
+  const modalData = useStore(s => s.modalData)
+  const showNotif = useStore(s => s.showNotif)
+  const close = () => useStore.setState({ modal: null })
+
+  const col = collections.find(c => c.id === modalData?.collectionId)
+  const [profiles, setProfiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null) // null | 'new' | profile object
+  const [impact, setImpact] = useState({}) // profileId -> impact
+
+  const load = async () => {
+    if (!col) return
+    setLoading(true)
+    const list = await apiFetch(`/api/collections/${col.id}/profiles`)
+    setProfiles(list)
+    const impacts = {}
+    await Promise.all(list.map(async p => { impacts[p.id] = await apiFetch(`/api/collections/${col.id}/profiles/${p.id}/impact`) }))
+    setImpact(impacts)
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [col?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deleteProfile = async (id) => {
+    await apiFetch(`/api/collections/${col.id}/profiles/${id}`, { method: 'DELETE' })
+    showNotif('Profile deleted', 'success')
+    load()
+  }
+
+  const exportProfile = async (profile, format) => {
+    const filtered = await apiFetch(`/api/collections/${col.id}/profiles/${profile.id}/apply`)
+    const data = format === 'postman' ? exportPostmanCollection(filtered)
+      : format === 'openapi' ? exportOpenAPI(filtered)
+      : exportInsomniaCollection(filtered)
+    downloadJson(`${(filtered.name || 'collection').replace(/\s+/g, '_')}.${format}.json`, data)
+  }
+
+  if (!col) return null
+
+  return (
+    <Modal title={`Audience Profiles — ${col.name}`} icon="shield" onClose={close} wide footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
+      {!editing && (
+        <>
+          <p className={styles.settingsHint} style={{ margin: '0 0 12px' }}>
+            A profile scopes this collection to a subset of requests for a given audience — export or generate an MCP server from just that slice, with chosen headers/params stripped.
+          </p>
+          <Btn variant="primary" size="sm" onClick={() => setEditing('new')} style={{ marginBottom: 12 }}>
+            <Icon name="plus" size={11} /> New profile
+          </Btn>
+          {loading && <Spinner size={14} />}
+          {!loading && profiles.length === 0 && <p className={styles.runnerEmpty}>No profiles yet.</p>}
+          <div className={styles.mockList} style={{ width: 'auto' }}>
+            {profiles.map(p => (
+              <div key={p.id} className={styles.mockRow} style={{ cursor: 'default', alignItems: 'flex-start' }}>
+                <div className={styles.mockInfo}>
+                  <span className={styles.mockName}>{p.name}</span>
+                  <span className={styles.mockMeta}>
+                    {impact[p.id] ? `${impact[p.id].includedRequests} of ${impact[p.id].totalRequests} requests` : '…'}
+                    {p.redactHeaders.length > 0 && ` · redacts ${p.redactHeaders.length} header(s)`}
+                    {p.redactParams.length > 0 && ` · redacts ${p.redactParams.length} param(s)`}
+                  </span>
+                </div>
+                <select
+                  className={styles.exportSel}
+                  value=""
+                  onChange={e => { if (e.target.value) exportProfile(p, e.target.value); e.target.value = '' }}
+                  title="Export this profile"
+                >
+                  <option value="" disabled>Export…</option>
+                  <option value="postman">as Postman</option>
+                  <option value="insomnia">as Insomnia</option>
+                  <option value="openapi">as OpenAPI 3.1</option>
+                </select>
+                <IconBtn name="edit"  size={11} title="Edit"   onClick={() => setEditing(p)} />
+                <IconBtn name="trash" size={11} title="Delete" onClick={() => deleteProfile(p.id)} danger />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {editing && (
+        <ProfileEditor
+          collection={col}
+          profile={editing === 'new' ? null : editing}
+          onCancel={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load() }}
+        />
+      )}
+    </Modal>
+  )
+}
+
+function ProfileEditor({ collection, profile, onCancel, onSaved }) {
+  const showNotif = useStore(s => s.showNotif)
+  const [name, setName] = useState(profile?.name || '')
+  const [description, setDescription] = useState(profile?.description || '')
+  const [mode, setMode] = useState(profile?.mode || 'allowlist')
+  const [requestIds, setRequestIds] = useState(new Set(profile?.requestIds || []))
+  const [redactHeaders, setRedactHeaders] = useState((profile?.redactHeaders || []).join(', '))
+  const [redactParams, setRedactParams] = useState((profile?.redactParams || []).join(', '))
+  const [saving, setSaving] = useState(false)
+
+  const toggleRequest = (id) => {
+    setRequestIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const save = async () => {
+    if (!name.trim()) { showNotif('Profile name is required', 'error'); return }
+    setSaving(true)
+    const body = {
+      name, description, mode,
+      requestIds: [...requestIds],
+      redactHeaders: redactHeaders.split(',').map(s => s.trim()).filter(Boolean),
+      redactParams: redactParams.split(',').map(s => s.trim()).filter(Boolean),
+    }
+    try {
+      if (profile) await apiFetch(`/api/collections/${collection.id}/profiles/${profile.id}`, { method: 'PUT', body })
+      else await apiFetch(`/api/collections/${collection.id}/profiles`, { method: 'POST', body })
+      showNotif('Profile saved', 'success')
+      onSaved()
+    } catch (e) { showNotif(e.message || 'Failed to save profile', 'error') }
+    setSaving(false)
+  }
+
+  return (
+    <div className={styles.settingsGrid} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <FormGroup label="Name">
+        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Public, Partner, AI Agent…" />
+      </FormGroup>
+      <FormGroup label="Description (optional)">
+        <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this audience allowed to see?" />
+      </FormGroup>
+      <FormGroup label="Mode">
+        <Select value={mode} onChange={e => setMode(e.target.value)}>
+          <option value="allowlist">Allowlist — only checked requests are included</option>
+          <option value="blocklist">Blocklist — everything except checked requests</option>
+        </Select>
+      </FormGroup>
+      <FormGroup label={mode === 'allowlist' ? 'Included requests' : 'Excluded requests'}>
+        <div className={styles.mcpConfigBox} style={{ maxHeight: 180, overflowY: 'auto' }}>
+          {(collection.requests || []).map(r => (
+            <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={requestIds.has(r.id)} onChange={() => toggleRequest(r.id)} />
+              <MethodBadge method={r.method} small />
+              {r.name}
+            </label>
+          ))}
+          {(collection.requests || []).length === 0 && <span className={styles.settingsHint}>This collection has no requests yet.</span>}
+        </div>
+      </FormGroup>
+      <FormGroup label="Redact headers (comma-separated, optional)">
+        <Input value={redactHeaders} onChange={e => setRedactHeaders(e.target.value)} placeholder="X-Admin-Token, X-Internal-Id" />
+      </FormGroup>
+      <FormGroup label="Redact query params (comma-separated, optional)">
+        <Input value={redactParams} onChange={e => setRedactParams(e.target.value)} placeholder="debug, internal_flag" />
+      </FormGroup>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+        <Btn variant="primary" onClick={save} disabled={saving}>{saving ? <Spinner size={12} /> : 'Save profile'}</Btn>
+      </div>
     </div>
   )
 }

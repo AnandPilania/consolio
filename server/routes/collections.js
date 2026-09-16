@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { scoreCollection } from '../scoring.js';
-import { suggestFixes, callAnthropic } from '../ai-suggest.js';
+import { suggestFixes, callProvider } from '../ai-suggest.js';
+import { createProfile, applyProfile, describeProfileImpact } from '../profiles.js';
+import { diffCollections } from '../diffCollections.js';
 
 export async function collectionRoutes(fastify, { storage }) {
     fastify.get('/api/collections', async () => storage.listCollections());
@@ -27,6 +29,68 @@ export async function collectionRoutes(fastify, { storage }) {
     fastify.delete('/api/collections/:id', async (req) => {
         storage.deleteCollection(req.params.id);
         return { deleted: true };
+    });
+
+    fastify.get('/api/collections/:id/profiles', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        return col.profiles || [];
+    });
+
+    fastify.post('/api/collections/:id/profiles', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        let profile;
+        try { profile = createProfile(req.body || {}); }
+        catch (e) { return reply.status(400).send({ error: e.message }); }
+        col.profiles = [...(col.profiles || []), profile];
+        storage.saveCollection(col);
+        return profile;
+    });
+
+    fastify.put('/api/collections/:id/profiles/:profileId', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        const idx = (col.profiles || []).findIndex(p => p.id === req.params.profileId);
+        if (idx === -1) return reply.status(404).send({ error: 'Profile not found' });
+        const updated = { ...col.profiles[idx], ...req.body, id: col.profiles[idx].id };
+        col.profiles[idx] = updated;
+        storage.saveCollection(col);
+        return updated;
+    });
+
+    fastify.delete('/api/collections/:id/profiles/:profileId', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        col.profiles = (col.profiles || []).filter(p => p.id !== req.params.profileId);
+        storage.saveCollection(col);
+        return { deleted: true };
+    });
+
+    fastify.get('/api/collections/:id/profiles/:profileId/impact', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        const profile = (col.profiles || []).find(p => p.id === req.params.profileId);
+        if (!profile) return reply.status(404).send({ error: 'Profile not found' });
+        return describeProfileImpact(col, profile);
+    });
+
+    fastify.get('/api/collections/:id/profiles/:profileId/apply', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        const profile = (col.profiles || []).find(p => p.id === req.params.profileId);
+        if (!profile) return reply.status(404).send({ error: 'Profile not found' });
+        return applyProfile(col, profile);
+    });
+
+    fastify.post('/api/collections/:id/diff', async (req, reply) => {
+        const col = storage.getCollection(req.params.id);
+        if (!col) return reply.status(404).send({ error: 'Collection not found' });
+        const candidate = req.body?.candidate;
+        if (!candidate || !Array.isArray(candidate.requests)) {
+            return reply.status(400).send({ error: 'body.candidate (a collection-shaped object with a requests[] array) is required' });
+        }
+        return diffCollections(col, candidate);
     });
 
     function buildRequest(body) {
@@ -67,8 +131,8 @@ export async function collectionRoutes(fastify, { storage }) {
     });
 
     fastify.post('/api/collections/:colId/requests/:reqId/ai-suggest', async (req, reply) => {
-        const { apiKey, model } = req.body || {};
-        if (!apiKey) return reply.status(400).send({ error: 'apiKey is required — this feature is bring-your-own-key' });
+        const { provider, apiKey, model, baseUrl } = req.body || {};
+        if (!provider) return reply.status(400).send({ error: 'provider is required (e.g. "anthropic", "openai", "azure-openai", "ollama", "openai-compatible")' });
 
         const col = storage.getCollection(req.params.colId);
         if (!col) return reply.status(404).send({ error: 'Collection not found' });
@@ -81,7 +145,7 @@ export async function collectionRoutes(fastify, { storage }) {
             const suggestion = await suggestFixes(
                 request,
                 lastEntry?.response || null,
-                (prompt) => callAnthropic({ apiKey, model, prompt })
+                (prompt) => callProvider(provider, { apiKey, model, baseUrl, prompt })
             );
             return suggestion;
         } catch (e) {
