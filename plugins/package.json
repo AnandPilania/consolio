@@ -1,5 +1,5 @@
 {
-  "name": "consolio-plugins",
-  "private": true,
-  "dependencies": {}
+	"name": "consolio-plugins",
+	"private": true,
+	"dependencies": {}
 }

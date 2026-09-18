@@ -466,9 +466,15 @@ an arbitrary string):
 | [`consolio-plugin-response-diagnostics`](plugins/consolio-plugin-response-diagnostics)     | Response tab                   | Shows status, timing, body type, payload size, and content type                                                                           |
 | [`consolio-plugin-request-response-audit`](plugins/consolio-plugin-request-response-audit) | Both panes                     | Adds matching audit tabs for request shape and response outcome                                                                           |
 | [`consolio-plugin-security-headers`](plugins/consolio-plugin-security-headers)             | `responseHooks` + Response tab | Flags missing CSP, clickjacking, MIME-sniffing, referrer, and permissions protections before production                                   |
+| [`consolio-plugin-cors-audit`](plugins/consolio-plugin-cors-audit)                         | `responseHooks` + Response tab | Explains invalid or conflicting CORS headers when browser clients cannot call an API                                                      |
+| [`consolio-plugin-error-inspector`](plugins/consolio-plugin-error-inspector)               | `responseHooks` + Response tab | Extracts summaries and validation details from JSON or plain-text 4xx/5xx responses                                                       |
 
 A minimal [`consolio-plugin-example`](examples/consolio-plugin-example) also lives under `examples/`,
 showing the full hook contract (all three hook types) for anyone writing their own plugin from scratch.
+
+The performance plugin uses a 1000ms default budget. Set `CONSOLIO_PERF_BUDGET_MS` before starting
+consolio to match a slower staging dependency or a stricter production target. Dynamic variables also
+include `{{% randomSlug %}}`, `{{% randomPhone %}}`, `{{% randomDate %}}`, and `{{% randomUrl %}}`.
 
 ## Browser interceptor
 
@@ -507,6 +513,9 @@ npm install        # install everything (server deps + UI devDeps) in one shot
 
 npm start          # production: serves dist/ at http://localhost:4242
 npm run build      # compile ui/ → dist/  (run once after clone, or after UI changes)
+npm run format     # format supported source files in place with Biome
+npm run lint       # run Biome's linter
+npm run check      # run Biome formatter and linter checks without writing files
 
 npm run dev        # development: API server on :4242 + Vite HMR on :5173
                    # both start simultaneously, logs colour-coded (cyan = api, yellow = ui)

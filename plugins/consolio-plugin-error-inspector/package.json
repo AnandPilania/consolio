@@ -1,0 +1,11 @@
+{
+	"name": "consolio-plugin-error-inspector",
+	"version": "1.0.0",
+	"author": "Consolio",
+	"release": "stable",
+	"description": "Extracts useful summaries from JSON and plain-text API error responses.",
+	"useCase": "Triage validation, authorization, and server errors without hunting through a large raw response body.",
+	"main": "index.js",
+	"type": "commonjs",
+	"private": true
+}

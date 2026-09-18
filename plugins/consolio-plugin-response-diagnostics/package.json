@@ -1,11 +1,11 @@
 {
-    "name": "consolio-plugin-response-diagnostics",
-    "version": "1.0.0",
-    "author": "Consolio",
-    "release": "stable",
-    "description": "Adds a response diagnostics tab for status, timing, and payload details.",
-    "useCase": "Check status, latency, content type, and payload size together when diagnosing unexpected API responses.",
-    "main": "index.js",
-    "type": "commonjs",
-    "private": true
+	"name": "consolio-plugin-response-diagnostics",
+	"version": "1.0.0",
+	"author": "Consolio",
+	"release": "stable",
+	"description": "Adds a response diagnostics tab for status, timing, and payload details.",
+	"useCase": "Check status, latency, content type, and payload size together when diagnosing unexpected API responses.",
+	"main": "index.js",
+	"type": "commonjs",
+	"private": true
 }

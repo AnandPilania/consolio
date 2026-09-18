@@ -1,0 +1,270 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Design tokens — the single source of truth for consolio's dark, amber-
+   accented theme. Kept as plain CSS vars (not just @theme) so any legacy
+   var(--x) reference still resolves during the migration.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+	--bg-base: #070709;
+	--bg-surface: #0d0d10;
+	--bg-raised: #141418;
+	--bg-overlay: #1a1a20;
+	--bg-subtle: #1f1f26;
+
+	--bd-faint: #1e1e26;
+	--bd-subtle: #28282f;
+	--bd-base: #32323c;
+	--bd-strong: #44444f;
+
+	--tx-base: #eeeef2;
+	--tx-muted: #8888a0;
+	--tx-faint: #4a4a60;
+	--tx-inverse: #07070a;
+
+	--accent: #f59e0b;
+	--accent-dim: rgba(245, 158, 11, 0.1);
+	--accent-glow: rgba(245, 158, 11, 0.18);
+	--accent-hover: #fbbf24;
+	--accent-press: #d97706;
+
+	--ok: #34d399;
+	--ok-dim: rgba(52, 211, 153, 0.12);
+	--err: #f87171;
+	--err-dim: rgba(248, 113, 113, 0.12);
+	--warn: #fbbf24;
+	--info: #60a5fa;
+
+	--m-GET: #34d399;
+	--m-POST: #60a5fa;
+	--m-PUT: #fbbf24;
+	--m-PATCH: #c084fc;
+	--m-DELETE: #f87171;
+	--m-HEAD: #94a3b8;
+	--m-OPTIONS: #94a3b8;
+
+	--font-ui: "Geist", "DM Sans", system-ui, sans-serif;
+	--font-mono: "Geist Mono", "JetBrains Mono", "Fira Code", monospace;
+
+	--sp-1: 4px;
+	--sp-2: 8px;
+	--sp-3: 12px;
+	--sp-4: 16px;
+	--sp-5: 20px;
+	--sp-6: 24px;
+
+	--r-sm: 4px;
+	--r-md: 6px;
+	--r-lg: 10px;
+	--r-xl: 16px;
+
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+	--shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+	--shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
+	--shadow-overlay: 0 24px 72px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--bd-subtle);
+
+	--sidebar-w: 256px;
+	--topbar-h: 42px;
+	--tabbar-h: 34px;
+	--reqbar-h: 50px;
+
+	/* ── shadcn/ui semantic layer — mapped onto the tokens above ─────────── */
+	--radius: var(--r-md);
+	--background: var(--bg-base);
+	--foreground: var(--tx-base);
+	--card: var(--bg-surface);
+	--card-foreground: var(--tx-base);
+	--popover: var(--bg-overlay);
+	--popover-foreground: var(--tx-base);
+	--primary: var(--accent);
+	--primary-foreground: var(--tx-inverse);
+	--secondary: var(--bg-subtle);
+	--secondary-foreground: var(--tx-base);
+	--muted: var(--bg-raised);
+	--muted-foreground: var(--tx-muted);
+	--accent-fg: var(--tx-base);
+	--destructive: var(--err);
+	--destructive-foreground: var(--tx-inverse);
+	--border: var(--bd-subtle);
+	--input: var(--bd-base);
+	--ring: var(--accent);
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--bg-subtle);
+	--color-accent-foreground: var(--accent-fg);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	--color-ok: var(--ok);
+	--color-err: var(--err);
+	--color-warn: var(--warn);
+	--color-info: var(--info);
+
+	--color-m-get: var(--m-GET);
+	--color-m-post: var(--m-POST);
+	--color-m-put: var(--m-PUT);
+	--color-m-patch: var(--m-PATCH);
+	--color-m-delete: var(--m-DELETE);
+	--color-m-head: var(--m-HEAD);
+	--color-m-options: var(--m-OPTIONS);
+
+	--font-sans: var(--font-ui);
+	--font-mono: var(--font-mono);
+
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: var(--r-xl);
+}
+
+* {
+	border-color: var(--border);
+	outline-color: var(--ring);
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	overflow: hidden;
+	background: var(--bg-base);
+	color: var(--tx-base);
+	font-family: var(--font-ui);
+	font-size: 13px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+	width: 5px;
+	height: 5px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--bd-base);
+	border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--bd-strong);
+}
+
+select {
+	cursor: pointer;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+/* ── Focus ring ───────────────────────────────────────────────────────────── */
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: var(--r-sm);
+}
+
+/* ── Keyframe animations ──────────────────────────────────────────────────── */
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes slideUp {
+	from {
+		transform: translateY(6px);
+		opacity: 0;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ── react-resizable-panels v2 — resize handle state ─────────────────────── */
+[data-resize-handle][data-resize-handle-active] {
+	background: var(--accent-glow);
+}
+
+/* ── JSON syntax tokens (response viewer / JsonTree) ──────────────────────── */
+.tok-key {
+	color: #7dd3fc;
+}
+.tok-str {
+	color: #86efac;
+}
+.tok-num {
+	color: #fca5a5;
+}
+.tok-bool {
+	color: #fbbf24;
+}
+.tok-null {
+	color: #94a3b8;
+}
+
+mark.hl {
+	background: rgba(245, 158, 11, 0.35);
+	color: var(--tx-base);
+	border-radius: 2px;
+}
+
+/* ── HTTP method text colour utility, used across sidebar / request / history ── */
+.method-GET {
+	color: var(--m-GET);
+}
+.method-POST {
+	color: var(--m-POST);
+}
+.method-PUT {
+	color: var(--m-PUT);
+}
+.method-PATCH {
+	color: var(--m-PATCH);
+}
+.method-DELETE {
+	color: var(--m-DELETE);
+}
+.method-HEAD {
+	color: var(--m-HEAD);
+}
+.method-OPTIONS {
+	color: var(--m-OPTIONS);
+}

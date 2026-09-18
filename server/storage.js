@@ -1,109 +1,168 @@
 import {
-    existsSync, mkdirSync, readdirSync,
-    readFileSync, writeFileSync, unlinkSync
-} from 'fs';
-import { join } from 'path';
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs"
+import { join } from "node:path"
 
 export class consolioStorage {
-    constructor(projectPath) {
-        this.projectPath = projectPath;
-        this.consolioDir = join(projectPath, '.consolio');
-        this.isProjectMode = existsSync(this.consolioDir);
-        if (!this.isProjectMode) {
-            const home = process.env.HOME || process.env.USERPROFILE || '';
-            this.consolioDir = join(home, '.consolio', 'global');
-        }
-        this._ensureDirs();
-    }
+	constructor(projectPath) {
+		this.projectPath = projectPath
+		this.consolioDir = join(projectPath, ".consolio")
+		this.isProjectMode = existsSync(this.consolioDir)
+		if (!this.isProjectMode) {
+			const home = process.env.HOME || process.env.USERPROFILE || ""
+			this.consolioDir = join(home, ".consolio", "global")
+		}
+		this._ensureDirs()
+	}
 
-    _ensureDirs() {
-        ['collections', 'environments', 'history', 'mocks'].forEach(d => {
-            mkdirSync(join(this.consolioDir, d), { recursive: true });
-        });
-        if (!existsSync(join(this.consolioDir, 'config.json'))) {
-            writeFileSync(join(this.consolioDir, 'config.json'), JSON.stringify({
-                name: this.isProjectMode ? 'Project' : 'Global Workspace',
-                version: '0.3.6',
-                created: new Date().toISOString(),
-                settings: { defaultEnvironment: null, timeout: 30000, followRedirects: true, sslVerify: true, previewLiveRender: false }
-            }, null, 2));
-        }
-    }
+	_ensureDirs() {
+		;["collections", "environments", "history", "mocks"].forEach((d) => {
+			mkdirSync(join(this.consolioDir, d), { recursive: true })
+		})
+		if (!existsSync(join(this.consolioDir, "config.json"))) {
+			writeFileSync(
+				join(this.consolioDir, "config.json"),
+				JSON.stringify(
+					{
+						name: this.isProjectMode ? "Project" : "Global Workspace",
+						version: "0.3.6",
+						created: new Date().toISOString(),
+						settings: {
+							defaultEnvironment: null,
+							timeout: 30000,
+							followRedirects: true,
+							sslVerify: true,
+							previewLiveRender: false,
+						},
+					},
+					null,
+					2,
+				),
+			)
+		}
+	}
 
-    getConfig() { return JSON.parse(readFileSync(join(this.consolioDir, 'config.json'), 'utf8')); }
-    saveConfig(c) { writeFileSync(join(this.consolioDir, 'config.json'), JSON.stringify(c, null, 2)); }
+	getConfig() {
+		return JSON.parse(
+			readFileSync(join(this.consolioDir, "config.json"), "utf8"),
+		)
+	}
+	saveConfig(c) {
+		writeFileSync(
+			join(this.consolioDir, "config.json"),
+			JSON.stringify(c, null, 2),
+		)
+	}
 
-    listCollections() {
-        const dir = join(this.consolioDir, 'collections');
-        return readdirSync(dir).filter(f => f.endsWith('.json'))
-            .map(f => { const d = JSON.parse(readFileSync(join(dir, f), 'utf8')); return { ...d, requests: d.requests || [] }; });
-    }
-    getCollection(id) {
-        const file = join(this.consolioDir, 'collections', `${id}.json`);
-        if (!existsSync(file)) return null;
-        return JSON.parse(readFileSync(file, 'utf8'));
-    }
-    saveCollection(c) {
-        writeFileSync(join(this.consolioDir, 'collections', `${c.id}.json`), JSON.stringify(c, null, 2));
-        return c;
-    }
-    deleteCollection(id) {
-        const f = join(this.consolioDir, 'collections', `${id}.json`);
-        if (existsSync(f)) unlinkSync(f);
-    }
+	listCollections() {
+		const dir = join(this.consolioDir, "collections")
+		return readdirSync(dir)
+			.filter((f) => f.endsWith(".json"))
+			.map((f) => {
+				const d = JSON.parse(readFileSync(join(dir, f), "utf8"))
+				return { ...d, requests: d.requests || [] }
+			})
+	}
+	getCollection(id) {
+		const file = join(this.consolioDir, "collections", `${id}.json`)
+		if (!existsSync(file)) return null
+		return JSON.parse(readFileSync(file, "utf8"))
+	}
+	saveCollection(c) {
+		writeFileSync(
+			join(this.consolioDir, "collections", `${c.id}.json`),
+			JSON.stringify(c, null, 2),
+		)
+		return c
+	}
+	deleteCollection(id) {
+		const f = join(this.consolioDir, "collections", `${id}.json`)
+		if (existsSync(f)) unlinkSync(f)
+	}
 
-    listEnvironments() {
-        const dir = join(this.consolioDir, 'environments');
-        return readdirSync(dir).filter(f => f.endsWith('.json'))
-            .map(f => JSON.parse(readFileSync(join(dir, f), 'utf8')));
-    }
-    saveEnvironment(e) {
-        writeFileSync(join(this.consolioDir, 'environments', `${e.id}.json`), JSON.stringify(e, null, 2));
-        return e;
-    }
-    deleteEnvironment(id) {
-        const f = join(this.consolioDir, 'environments', `${id}.json`);
-        if (existsSync(f)) unlinkSync(f);
-    }
+	listEnvironments() {
+		const dir = join(this.consolioDir, "environments")
+		return readdirSync(dir)
+			.filter((f) => f.endsWith(".json"))
+			.map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
+	}
+	saveEnvironment(e) {
+		writeFileSync(
+			join(this.consolioDir, "environments", `${e.id}.json`),
+			JSON.stringify(e, null, 2),
+		)
+		return e
+	}
+	deleteEnvironment(id) {
+		const f = join(this.consolioDir, "environments", `${id}.json`)
+		if (existsSync(f)) unlinkSync(f)
+	}
 
-    addHistory(entry) {
-        const histDir = join(this.consolioDir, 'history');
-        writeFileSync(join(histDir, `${entry.id}.json`), JSON.stringify(entry, null, 2));
-        const files = readdirSync(histDir).sort();
-        if (files.length > 200) files.slice(0, files.length - 200).forEach(f => unlinkSync(join(histDir, f)));
-        return entry;
-    }
-    getHistory(limit = 50) {
-        const histDir = join(this.consolioDir, 'history');
-        return readdirSync(histDir).filter(f => f.endsWith('.json')).sort().reverse()
-            .slice(0, limit).map(f => JSON.parse(readFileSync(join(histDir, f), 'utf8')));
-    }
-    getAllHistory() {
-        const histDir = join(this.consolioDir, 'history');
-        return readdirSync(histDir).filter(f => f.endsWith('.json')).sort().reverse()
-            .map(f => JSON.parse(readFileSync(join(histDir, f), 'utf8')));
-    }
-    clearHistory() {
-        const d = join(this.consolioDir, 'history');
-        readdirSync(d).forEach(f => unlinkSync(join(d, f)));
-    }
+	addHistory(entry) {
+		const histDir = join(this.consolioDir, "history")
+		writeFileSync(
+			join(histDir, `${entry.id}.json`),
+			JSON.stringify(entry, null, 2),
+		)
+		const files = readdirSync(histDir).sort()
+		if (files.length > 200)
+			files.slice(0, files.length - 200).forEach((f) => {
+				unlinkSync(join(histDir, f))
+			})
+		return entry
+	}
+	getHistory(limit = 50) {
+		const histDir = join(this.consolioDir, "history")
+		return readdirSync(histDir)
+			.filter((f) => f.endsWith(".json"))
+			.sort()
+			.reverse()
+			.slice(0, limit)
+			.map((f) => JSON.parse(readFileSync(join(histDir, f), "utf8")))
+	}
+	getAllHistory() {
+		const histDir = join(this.consolioDir, "history")
+		return readdirSync(histDir)
+			.filter((f) => f.endsWith(".json"))
+			.sort()
+			.reverse()
+			.map((f) => JSON.parse(readFileSync(join(histDir, f), "utf8")))
+	}
+	clearHistory() {
+		const d = join(this.consolioDir, "history")
+		readdirSync(d).forEach((f) => {
+			unlinkSync(join(d, f))
+		})
+	}
 
-    listMocks() {
-        const dir = join(this.consolioDir, 'mocks');
-        return readdirSync(dir).filter(f => f.endsWith('.json'))
-            .map(f => { const d = JSON.parse(readFileSync(join(dir, f), 'utf8')); return { ...d, routes: d.routes || [] }; });
-    }
-    getMock(id) {
-        const file = join(this.consolioDir, 'mocks', `${id}.json`);
-        if (!existsSync(file)) return null;
-        return JSON.parse(readFileSync(file, 'utf8'));
-    }
-    saveMock(m) {
-        writeFileSync(join(this.consolioDir, 'mocks', `${m.id}.json`), JSON.stringify(m, null, 2));
-        return m;
-    }
-    deleteMock(id) {
-        const f = join(this.consolioDir, 'mocks', `${id}.json`);
-        if (existsSync(f)) unlinkSync(f);
-    }
+	listMocks() {
+		const dir = join(this.consolioDir, "mocks")
+		return readdirSync(dir)
+			.filter((f) => f.endsWith(".json"))
+			.map((f) => {
+				const d = JSON.parse(readFileSync(join(dir, f), "utf8"))
+				return { ...d, routes: d.routes || [] }
+			})
+	}
+	getMock(id) {
+		const file = join(this.consolioDir, "mocks", `${id}.json`)
+		if (!existsSync(file)) return null
+		return JSON.parse(readFileSync(file, "utf8"))
+	}
+	saveMock(m) {
+		writeFileSync(
+			join(this.consolioDir, "mocks", `${m.id}.json`),
+			JSON.stringify(m, null, 2),
+		)
+		return m
+	}
+	deleteMock(id) {
+		const f = join(this.consolioDir, "mocks", `${id}.json`)
+		if (existsSync(f)) unlinkSync(f)
+	}
 }

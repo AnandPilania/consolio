@@ -1,103 +1,148 @@
-import assert from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import assert from "node:assert"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join, resolve } from "node:path"
+import test from "node:test"
 import {
-    listInstalledPlugins, listBundledPlugins, installPlugin, uninstallPlugin, setPluginEnabled,
-    loadEnabledPlugins, runRequestHooks, runResponseHooks, applyTemplateTags, listPaneTabs, renderPaneTab,
-} from './loader.js';
+	applyTemplateTags,
+	installPlugin,
+	listBundledPlugins,
+	listInstalledPlugins,
+	listPaneTabs,
+	loadEnabledPlugins,
+	renderPaneTab,
+	runRequestHooks,
+	runResponseHooks,
+	setPluginEnabled,
+	uninstallPlugin,
+} from "./loader.js"
 
-// applyTemplateTags: resolves a known tag, leaves unknown tags untouched
-{
-    const tags = { shout: () => 'LOUD' };
-    assert.strictEqual(applyTemplateTags('say {{% shout %}} now', tags), 'say LOUD now');
-    assert.strictEqual(applyTemplateTags('say {{% nope %}} now', tags), 'say {{% nope %}} now');
-    assert.strictEqual(applyTemplateTags('plain string', tags), 'plain string');
-}
+test("applyTemplateTags: resolves a known tag, leaves unknown tags untouched", async () => {
+	const tags = { shout: () => "LOUD" }
+	assert.strictEqual(
+		applyTemplateTags("say {{% shout %}} now", tags),
+		"say LOUD now",
+	)
+	assert.strictEqual(
+		applyTemplateTags("say {{% nope %}} now", tags),
+		"say {{% nope %}} now",
+	)
+	assert.strictEqual(applyTemplateTags("plain string", tags), "plain string")
+})
 
-// Bundled plugin metadata must stay useful in the Plugin Manager.
-{
-    const security = listBundledPlugins().find(plugin => plugin.name === 'consolio-plugin-security-headers');
-    assert.ok(security);
-    assert.strictEqual(security.author, 'Consolio');
-    assert.ok(security.useCase.includes('missing') && security.useCase.includes('protections'));
-}
+test("Bundled plugin metadata must stay useful in the Plugin Manager.", async () => {
+	const security = listBundledPlugins().find(
+		(plugin) => plugin.name === "consolio-plugin-security-headers",
+	)
+	assert.ok(security)
+	assert.strictEqual(security.author, "Consolio")
+	assert.ok(
+		security.useCase.includes("missing") &&
+			security.useCase.includes("protections"),
+	)
+})
 
-// Pane tabs are discoverable without exposing their render functions to the browser.
-{
-    const hooks = {
-        paneTabs: {
-            request: [{ plugin: 'sample', id: 'request-info', label: 'Request info', render: ({ request }) => ({ text: request.method }) }],
-            response: [],
-        },
-    };
-    assert.deepStrictEqual(listPaneTabs(hooks), {
-        request: [{ plugin: 'sample', id: 'request-info', label: 'Request info', pluginInfo: undefined }],
-        response: [],
-        plugins: {},
-    });
-    assert.deepStrictEqual(await renderPaneTab(hooks, {
-        pane: 'request', plugin: 'sample', id: 'request-info', context: { request: { method: 'POST' } },
-    }), { text: 'POST' });
-}
+test("Pane tabs are discoverable without exposing their render functions to the browser.", async () => {
+	const hooks = {
+		paneTabs: {
+			request: [
+				{
+					plugin: "sample",
+					id: "request-info",
+					label: "Request info",
+					render: ({ request }) => ({ text: request.method }),
+				},
+			],
+			response: [],
+		},
+	}
+	assert.deepStrictEqual(listPaneTabs(hooks), {
+		request: [
+			{
+				plugin: "sample",
+				id: "request-info",
+				label: "Request info",
+				pluginInfo: undefined,
+			},
+		],
+		response: [],
+		plugins: {},
+	})
+	assert.deepStrictEqual(
+		await renderPaneTab(hooks, {
+			pane: "request",
+			plugin: "sample",
+			id: "request-info",
+			context: { request: { method: "POST" } },
+		}),
+		{ text: "POST" },
+	)
+})
 
-// runRequestHooks / runResponseHooks: chain multiple hooks, each seeing the prior mutation
-{
-    const hooks = {
-        requestHooks: [
-            r => ({ ...r, headers: [...r.headers, 'a'] }),
-            r => ({ ...r, headers: [...r.headers, 'b'] }),
-        ],
-        responseHooks: [r => ({ ...r, body: r.body + '!' })],
-    };
-    const req = await runRequestHooks(hooks, { headers: [] });
-    assert.deepStrictEqual(req.headers, ['a', 'b']);
-    const res = await runResponseHooks(hooks, { body: 'hi' });
-    assert.strictEqual(res.body, 'hi!');
-}
+test("runRequestHooks / runResponseHooks: chain multiple hooks, each seeing the prior mutation", async () => {
+	const hooks = {
+		requestHooks: [
+			(r) => ({ ...r, headers: [...r.headers, "a"] }),
+			(r) => ({ ...r, headers: [...r.headers, "b"] }),
+		],
+		responseHooks: [(r) => ({ ...r, body: `${r.body}!` })],
+	}
+	const req = await runRequestHooks(hooks, { headers: [] })
+	assert.deepStrictEqual(req.headers, ["a", "b"])
+	const res = await runResponseHooks(hooks, { body: "hi" })
+	assert.strictEqual(res.body, "hi!")
+})
 
-// Full install → load → disable → uninstall cycle against a real npm project on disk,
-// installing the repo's own reference plugin by local path (no network access needed —
-// npm treats a filesystem path argument as a local install, same code path as a real
-// registry package name).
-{
-    const scratchRoot = mkdtempSync(join(tmpdir(), 'consolio-plugin-test-'));
-    const storage = { consolioDir: scratchRoot };
-    const pluginPath = resolve(import.meta.dirname, '../../examples/consolio-plugin-example');
+test("Full install → load → disable → uninstall cycle against a real npm project on disk", async () => {
+	const scratchRoot = mkdtempSync(join(tmpdir(), "consolio-plugin-test-"))
+	const storage = { consolioDir: scratchRoot }
+	const pluginPath = resolve(
+		import.meta.dirname,
+		"../../examples/consolio-plugin-example",
+	)
 
-    try {
-        const installed = await installPlugin(storage, pluginPath);
-        assert.strictEqual(installed.name, 'consolio-plugin-example');
-        assert.strictEqual(installed.enabled, true);
-        assert.strictEqual(installed.author, 'Consolio');
-        assert.strictEqual(installed.release, 'stable');
-        assert.ok(installed.useCase.includes('starting point'));
-        assert.strictEqual(listInstalledPlugins(storage).length, 1);
+	try {
+		const installed = await installPlugin(storage, pluginPath)
+		assert.strictEqual(installed.name, "consolio-plugin-example")
+		assert.strictEqual(installed.enabled, true)
+		assert.strictEqual(installed.author, "Consolio")
+		assert.strictEqual(installed.release, "stable")
+		assert.ok(installed.useCase.includes("starting point"))
+		assert.strictEqual(listInstalledPlugins(storage).length, 1)
 
-        const hooks = await loadEnabledPlugins(storage);
-        assert.strictEqual(hooks.requestHooks.length, 1);
-        assert.strictEqual(hooks.responseHooks.length, 1);
-        assert.strictEqual(typeof hooks.templateTags.timestamp, 'function');
+		const hooks = await loadEnabledPlugins(storage)
+		assert.strictEqual(hooks.requestHooks.length, 1)
+		assert.strictEqual(hooks.responseHooks.length, 1)
+		assert.strictEqual(typeof hooks.templateTags.timestamp, "function")
 
-        const req = await runRequestHooks(hooks, { method: 'GET', url: 'http://x', headers: [] });
-        assert.ok(req.headers.some(h => h.key === 'X-Consolio-Plugin' && h.value === 'example'));
+		const req = await runRequestHooks(hooks, {
+			method: "GET",
+			url: "http://x",
+			headers: [],
+		})
+		assert.ok(
+			req.headers.some(
+				(h) => h.key === "X-Consolio-Plugin" && h.value === "example",
+			),
+		)
 
-        const res = await runResponseHooks(hooks, { headers: {}, body: '{}' });
-        assert.strictEqual(res.headers['x-plugin-processed'], 'true');
+		const res = await runResponseHooks(hooks, { headers: {}, body: "{}" })
+		assert.strictEqual(res.headers["x-plugin-processed"], "true")
 
-        assert.ok(applyTemplateTags('{{% timestamp %}}', hooks.templateTags).endsWith('Z'));
+		assert.ok(
+			applyTemplateTags("{{% timestamp %}}", hooks.templateTags).endsWith("Z"),
+		)
 
-        // disabling excludes it from loadEnabledPlugins without uninstalling
-        setPluginEnabled(storage, 'consolio-plugin-example', false);
-        const hooksDisabled = await loadEnabledPlugins(storage);
-        assert.strictEqual(hooksDisabled.requestHooks.length, 0);
-        assert.strictEqual(listInstalledPlugins(storage)[0].enabled, false);
+		setPluginEnabled(storage, "consolio-plugin-example", false)
+		const hooksDisabled = await loadEnabledPlugins(storage)
+		assert.strictEqual(hooksDisabled.requestHooks.length, 0)
+		assert.strictEqual(listInstalledPlugins(storage)[0].enabled, false)
 
-        await uninstallPlugin(storage, 'consolio-plugin-example');
-        assert.strictEqual(listInstalledPlugins(storage).length, 0);
-    } finally {
-        rmSync(scratchRoot, { recursive: true, force: true });
-    }
-}
+		await uninstallPlugin(storage, "consolio-plugin-example")
+		assert.strictEqual(listInstalledPlugins(storage).length, 0)
+	} finally {
+		rmSync(scratchRoot, { recursive: true, force: true })
+	}
+})
 
-console.log('loader.test.js: all checks passed');
+console.log("loader.test.js: all checks passed")

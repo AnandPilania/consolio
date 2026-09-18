@@ -1,11 +1,11 @@
 {
-    "name": "consolio-plugin-request-inspector",
-    "version": "1.0.0",
-    "author": "Consolio",
-    "release": "stable",
-    "description": "Adds a request overview tab with the effective request shape.",
-    "useCase": "Verify the method, URL, parameters, headers, and body mode before sending a request to a hard-to-debug endpoint.",
-    "main": "index.js",
-    "type": "commonjs",
-    "private": true
+	"name": "consolio-plugin-request-inspector",
+	"version": "1.0.0",
+	"author": "Consolio",
+	"release": "stable",
+	"description": "Adds a request overview tab with the effective request shape.",
+	"useCase": "Verify the method, URL, parameters, headers, and body mode before sending a request to a hard-to-debug endpoint.",
+	"main": "index.js",
+	"type": "commonjs",
+	"private": true
 }

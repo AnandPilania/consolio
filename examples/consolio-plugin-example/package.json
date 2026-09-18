@@ -1,11 +1,11 @@
 {
-    "name": "consolio-plugin-example",
-    "version": "1.0.0",
-    "author": "Consolio",
-    "release": "stable",
-    "description": "Reference consolio plugin — demonstrates requestHooks, responseHooks, and templateTags.",
-    "useCase": "Use this package as a copyable starting point when building a custom request or response workflow plugin.",
-    "main": "index.js",
-    "type": "commonjs",
-    "private": true
+	"name": "consolio-plugin-example",
+	"version": "1.0.0",
+	"author": "Consolio",
+	"release": "stable",
+	"description": "Reference consolio plugin — demonstrates requestHooks, responseHooks, and templateTags.",
+	"useCase": "Use this package as a copyable starting point when building a custom request or response workflow plugin.",
+	"main": "index.js",
+	"type": "commonjs",
+	"private": true
 }

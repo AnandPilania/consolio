@@ -1,0 +1,11 @@
+{
+	"name": "consolio-plugin-cors-audit",
+	"version": "1.0.0",
+	"author": "Consolio",
+	"release": "stable",
+	"description": "Audits CORS response headers and explains browser-integration failures.",
+	"useCase": "Diagnose why a frontend cannot call an API because of missing, conflicting, or invalid CORS headers.",
+	"main": "index.js",
+	"type": "commonjs",
+	"private": true
+}
