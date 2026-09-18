@@ -1,7 +1,6 @@
 import { io } from 'socket.io-client';
 import { sendToType } from './wsRelay.js';
 
-// One real socket.io-client connection per UI tab, same one-per-tab model as wsProxy.js.
 const targets = new Map();
 
 const sendToUi = (wss, tabId, payload) => sendToType(wss, `sio-proxy:${tabId}`, payload);

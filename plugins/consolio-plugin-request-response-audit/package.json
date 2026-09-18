@@ -1,0 +1,11 @@
+{
+    "name": "consolio-plugin-request-response-audit",
+    "version": "1.0.0",
+    "author": "Consolio",
+    "release": "stable",
+    "description": "Adds request and response audit tabs for quick endpoint verification.",
+    "useCase": "Perform a compact before-and-after endpoint check while debugging auth, mutation, and regression failures.",
+    "main": "index.js",
+    "type": "commonjs",
+    "private": true
+}

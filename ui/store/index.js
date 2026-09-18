@@ -8,6 +8,13 @@ const DEFAULT_PANELS = {
     responsePane: { visible: true, size: 55, minSize: 20, maxSize: 80, order: 2 },
 }
 
+function normalizePluginTabs(value) {
+    return {
+        request: Array.isArray(value?.request) ? value.request : [],
+        response: Array.isArray(value?.response) ? value.response : [],
+    }
+}
+
 function mergePanels(saved) {
     if (!saved) return DEFAULT_PANELS
     const result = { ...DEFAULT_PANELS }
@@ -83,6 +90,7 @@ export const useStore = create(
             activeEnvId: null,
             history: [],
             config: { name: 'Workspace', isProjectMode: false },
+            pluginTabs: { request: [], response: [] },
 
             /* Live WebSocket connections, keyed by tab id — not persisted (real live sockets) */
             wsSockets: {},
@@ -346,8 +354,6 @@ export const useStore = create(
                 const { getActiveTab, updateTab } = get()
                 updateTab(getActiveTab().id, { grpcFrames: [] })
             },
-            // Lazily opens (or reuses) the per-tab gRPC control channel, then sends `action`
-            // once it's open — used by both loadGrpcProto() and callGrpc().
             grpcSend(action) {
                 const { getActiveTab, updateTab, appendGrpcFrame, showNotif } = get()
                 const tabId = getActiveTab().id
@@ -508,16 +514,20 @@ export const useStore = create(
             /* ── Bootstrap ─────────────────────────────────────────────────────── */
             async boot() {
                 try {
-                    const [cols, envs, hist, cfg] = await Promise.all([
+                    const [cols, envs, hist, cfg, pluginTabs] = await Promise.all([
                         apiFetch('/api/collections'), apiFetch('/api/environments'),
-                        apiFetch('/api/history?limit=30'), apiFetch('/api/config'),
+                        apiFetch('/api/history?limit=30'), apiFetch('/api/config'), apiFetch('/api/plugins/ui'),
                     ])
                     set(s => ({
                         collections: cols, environments: envs, history: hist, config: cfg,
+                        pluginTabs: normalizePluginTabs(pluginTabs),
                         activeEnvId: s.activeEnvId || envs[0]?.id || null,
                         expandedCols: cols.length ? { [cols[0].id]: true } : {},
                     }))
                 } catch { }
+            },
+            async loadPluginTabs() {
+                try { set({ pluginTabs: normalizePluginTabs(await apiFetch('/api/plugins/ui')) }) } catch { }
             },
         }),
         {

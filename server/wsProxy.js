@@ -1,10 +1,6 @@
 import WebSocket from 'ws';
 import { sendToType } from './wsRelay.js';
 
-// One real target connection per UI tab. The UI's own `ws-proxy:<tabId>` socket is
-// purely a control/relay channel to the consolio server — the actual WebSocket to the
-// target lives here, server-side, so the browser never has to deal with the target's
-// CORS/TLS/auth-header requirements directly.
 const targets = new Map();
 
 const sendToUi = (wss, tabId, payload) => sendToType(wss, `ws-proxy:${tabId}`, payload);

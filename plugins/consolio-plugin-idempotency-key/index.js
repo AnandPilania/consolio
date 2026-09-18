@@ -12,4 +12,24 @@ module.exports = {
             return { ...request, headers }
         },
     ],
+    paneTabs: {
+        request: [{
+            id: 'safety',
+            label: 'Safety',
+            render: ({ request }) => {
+                const method = (request.method || '').toUpperCase()
+                const applies = MUTATING_METHODS.has(method)
+                const header = (request.headers || []).find(h => h.enabled !== false && h.key?.toLowerCase() === 'idempotency-key')
+                return {
+                    kind: 'table',
+                    rows: [
+                        { label: 'Method', value: method || 'GET' },
+                        { label: 'Protection', value: applies ? 'Enabled for this mutation' : 'Not needed for this method' },
+                        { label: 'Key', value: header?.value || 'Generated at send time' },
+                        { label: 'Why it helps', value: 'Retries will not double-submit when the API honors Idempotency-Key' },
+                    ],
+                }
+            },
+        }],
+    },
 }

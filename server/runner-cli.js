@@ -14,8 +14,6 @@ function findEnvironment(storage, name) {
     return envs.find(e => e.id === name) || envs.find(e => (e.name || '').toLowerCase() === name.toLowerCase()) || null;
 }
 
-// Runs a collection in-process — no HTTP server involved — reusing the exact same
-// executeRequest pipeline (pre-script → send → tests → post-script) as the UI runner and /api/execute.
 export async function runCollectionCli(collectionArg, options) {
     const storage = new consolioStorage(options.project || process.cwd());
     const col = findCollection(storage, collectionArg);

@@ -1,13 +1,9 @@
 import { sendToType } from './wsRelay.js';
 
-// One in-flight streaming fetch per UI tab, same one-per-tab model as wsProxy.js.
 const controllers = new Map();
 
 const sendToUi = (wss, tabId, payload) => sendToType(wss, `sse-proxy:${tabId}`, payload);
 
-// SSE framing: events are separated by a blank line; `data:` lines (possibly multiple)
-// join with \n, `event:`/`id:` are single-value. Returns parsed events plus whatever
-// incomplete trailing text should be carried over into the next chunk.
 export function extractEvents(buffer) {
     const normalized = buffer.replace(/\r\n/g, '\n');
     const parts = normalized.split('\n\n');

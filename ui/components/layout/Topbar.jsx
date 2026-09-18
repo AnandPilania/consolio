@@ -1,6 +1,7 @@
 import { useStore } from '../../store'
-import { Icon, IconBtn } from '../shared'
-import styles from './Topbar.module.css'
+import { Zap, ChevronDown } from 'lucide-react'
+import { IconBtn } from '../shared'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 export function Topbar() {
   const config       = useStore(s => s.config)
@@ -16,31 +17,30 @@ export function Topbar() {
   }
 
   return (
-    <header className={styles.topbar}>
-      <div className={styles.logo}>
-        <Icon name="zap" size={16} style={{ color: 'var(--accent)' }} />
+    <header className="z-20 flex h-[var(--topbar-h)] shrink-0 items-center gap-2 border-b border-[var(--bd-faint)] bg-[var(--bg-surface)] px-3">
+      <div className="flex items-center gap-1.5 pr-2 text-sm font-bold tracking-tight text-foreground">
+        <Zap size={16} className="text-primary" />
         <span>consolio</span>
       </div>
 
-      <div className={styles.projectBadge}>
+      <div className="rounded-full border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-0.5 text-[11px] text-[var(--tx-faint)]">
         {config.isProjectMode ? '📁' : '🌐'} {config.name}
       </div>
 
-      <div className={styles.spacer} />
+      <div className="flex-1" />
 
-      <div className={styles.envPicker}>
-        <span className={styles.envDot} style={{ background: env?.color || 'var(--accent)' }} />
-        <select
-          className={styles.envSelect}
-          value={activeEnvId || ''}
-          onChange={e => switchEnv(e.target.value)}
-        >
-          {environments.length === 0 && <option value="">No environments</option>}
-          {environments.map(e => (
-            <option key={e.id} value={e.id}>{e.name}</option>
-          ))}
-        </select>
-        <Icon name="chevDown" size={11} style={{ color: 'var(--tx-faint)', pointerEvents: 'none' }} />
+      <div className="flex items-center gap-1 rounded-md border border-[var(--bd-subtle)] bg-[var(--bg-raised)] pl-2 transition-colors hover:border-[var(--bd-base)]">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: env?.color || 'var(--accent)' }} />
+        <Select value={activeEnvId || ''} onValueChange={switchEnv}>
+          <SelectTrigger size="sm" className="h-6 gap-1 border-none bg-transparent px-1.5 text-muted-foreground shadow-none focus-visible:ring-0">
+            <SelectValue placeholder="No environments" />
+          </SelectTrigger>
+          <SelectContent>
+            {environments.map(e => (
+              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <IconBtn name="globe"    title="Mock servers"     onClick={() => useStore.setState({ modal: 'mocks' })} />

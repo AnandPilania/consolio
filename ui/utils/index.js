@@ -296,7 +296,6 @@ export function importInsomniaExport(json) {
         folderIdMap[g._id] = folder
         col.folders.push(folder)
     })
-    // second pass: resolve parentId now that every group has a mapped id
     resources.filter(r => r._type === 'request_group').forEach(g => {
         if (g.parentId && g.parentId !== rootId && folderIdMap[g.parentId]) {
             folderIdMap[g._id].parentId = folderIdMap[g.parentId].id
@@ -429,7 +428,6 @@ function bodyToInsomnia(body) {
     return {}
 }
 
-// Insomnia v4 export — a flat resources[] array; nesting is expressed via parentId references.
 export function exportInsomniaCollection(col) {
     const workspaceId = `__WORKSPACE_${uid()}`
     const folders = col.folders || []

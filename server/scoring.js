@@ -52,7 +52,6 @@ const CHECKS = [
         test: (r) => {
             const suspicious = /(api[_-]?key|token|secret|password)\s*[:=]\s*[A-Za-z0-9_\-]{8,}/i;
             const haystack = [r.url, ...(r.headers || []).map(h => h.value)].filter(Boolean).join(' ');
-            // {{VAR}} references are fine — this only flags literal-looking values.
             return !suspicious.test(haystack) || /\{\{.*\}\}/.test(haystack);
         },
         fix: 'Move hardcoded credentials into an environment variable ({{VAR}}) instead of the raw request.'

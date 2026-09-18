@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-    listInstalledPlugins, installPlugin, uninstallPlugin, setPluginEnabled,
-    loadEnabledPlugins, runRequestHooks, runResponseHooks, applyTemplateTags,
+    listInstalledPlugins, listBundledPlugins, installPlugin, uninstallPlugin, setPluginEnabled,
+    loadEnabledPlugins, runRequestHooks, runResponseHooks, applyTemplateTags, listPaneTabs, renderPaneTab,
 } from './loader.js';
 
 // applyTemplateTags: resolves a known tag, leaves unknown tags untouched
@@ -13,6 +13,32 @@ import {
     assert.strictEqual(applyTemplateTags('say {{% shout %}} now', tags), 'say LOUD now');
     assert.strictEqual(applyTemplateTags('say {{% nope %}} now', tags), 'say {{% nope %}} now');
     assert.strictEqual(applyTemplateTags('plain string', tags), 'plain string');
+}
+
+// Bundled plugin metadata must stay useful in the Plugin Manager.
+{
+    const security = listBundledPlugins().find(plugin => plugin.name === 'consolio-plugin-security-headers');
+    assert.ok(security);
+    assert.strictEqual(security.author, 'Consolio');
+    assert.ok(security.useCase.includes('missing') && security.useCase.includes('protections'));
+}
+
+// Pane tabs are discoverable without exposing their render functions to the browser.
+{
+    const hooks = {
+        paneTabs: {
+            request: [{ plugin: 'sample', id: 'request-info', label: 'Request info', render: ({ request }) => ({ text: request.method }) }],
+            response: [],
+        },
+    };
+    assert.deepStrictEqual(listPaneTabs(hooks), {
+        request: [{ plugin: 'sample', id: 'request-info', label: 'Request info', pluginInfo: undefined }],
+        response: [],
+        plugins: {},
+    });
+    assert.deepStrictEqual(await renderPaneTab(hooks, {
+        pane: 'request', plugin: 'sample', id: 'request-info', context: { request: { method: 'POST' } },
+    }), { text: 'POST' });
 }
 
 // runRequestHooks / runResponseHooks: chain multiple hooks, each seeing the prior mutation
@@ -43,6 +69,9 @@ import {
         const installed = await installPlugin(storage, pluginPath);
         assert.strictEqual(installed.name, 'consolio-plugin-example');
         assert.strictEqual(installed.enabled, true);
+        assert.strictEqual(installed.author, 'Consolio');
+        assert.strictEqual(installed.release, 'stable');
+        assert.ok(installed.useCase.includes('starting point'));
         assert.strictEqual(listInstalledPlugins(storage).length, 1);
 
         const hooks = await loadEnabledPlugins(storage);

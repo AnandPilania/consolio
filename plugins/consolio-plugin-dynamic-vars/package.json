@@ -1,7 +1,10 @@
 {
     "name": "consolio-plugin-dynamic-vars",
     "version": "1.0.0",
+    "author": "Consolio",
+    "release": "stable",
     "description": "Postman-style dynamic variables — {{% uuid %}}, {{% timestamp %}}, {{% randomEmail %}}, etc. — for generating test data on the fly.",
+    "useCase": "Create fresh IDs, users, timestamps, and network values for repeatable exploratory requests without hand-editing payloads.",
     "main": "index.js",
     "type": "commonjs",
     "private": true

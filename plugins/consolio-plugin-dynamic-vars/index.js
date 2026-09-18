@@ -28,4 +28,20 @@ module.exports = {
         randomEmail: () => `${randomFirstName()}.${randomLastName()}${Math.floor(Math.random() * 100)}@example.com`.toLowerCase(),
         randomIp: () => Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 254)).join('.'),
     },
+    paneTabs: {
+        request: [{
+            id: 'generators',
+            label: 'Generators',
+            render: () => ({
+                kind: 'table',
+                rows: [
+                    { label: 'Identity', value: '{{% uuid %}}, {{% guid %}}' },
+                    { label: 'Time', value: '{{% timestamp %}}, {{% isoTimestamp %}}' },
+                    { label: 'Numbers', value: '{{% randomInt %}}, {{% randomFloat %}}, {{% randomBoolean %}}' },
+                    { label: 'People', value: '{{% randomFirstName %}}, {{% randomLastName %}}, {{% randomEmail %}}' },
+                    { label: 'Network', value: '{{% randomHex8 %}}, {{% randomIp %}}' },
+                ],
+            }),
+        }],
+    },
 }

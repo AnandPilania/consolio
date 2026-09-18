@@ -5,19 +5,22 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-// On Windows, npm is a .cmd shim — plain execFile('npm', ...) can't resolve it without
-// either the extension or a shell (unlike POSIX, where the bare name works via PATH).
 const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-// consolio ships a handful of genuinely useful plugins in its own top-level plugins/ folder
-// (see package.json's "files" list — it's included when the package is published). This is
-// the package's own source directory, unrelated to the *runtime* <consolioDir>/plugins/
-// workspace that getPluginsDir() resolves per-project/global above — same name, different
-// thing: one is shipped source, the other is where installs actually land. Bundled-plugin
-// installs resolve a name against this fixed, server-enumerated list of real directories
-// rather than accepting an arbitrary path from the request, so the one-click "install" button
-// can't be turned into a path-traversal/arbitrary-install primitive by a hostile origin.
 const BUNDLED_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'plugins');
+
+function pluginMetadata(pkg, fallbackName = 'Unknown plugin') {
+    const author = typeof pkg.author === 'string' ? pkg.author : pkg.author?.name;
+    return {
+        name: pkg.name || fallbackName,
+        author: author || 'Not specified',
+        version: pkg.version || 'Not specified',
+        release: pkg.release || pkg.releaseDate || 'Not specified',
+        description: pkg.description || 'No description provided.',
+        useCase: pkg.useCase || 'Use this plugin to extend consolio for a recurring API development workflow.',
+        homepage: pkg.homepage || pkg.repository?.url || null,
+    };
+}
 
 export function listBundledPlugins() {
     if (!existsSync(BUNDLED_DIR)) return [];
@@ -27,14 +30,11 @@ export function listBundledPlugins() {
             const pkgPath = join(BUNDLED_DIR, d.name, 'package.json');
             if (!existsSync(pkgPath)) return null;
             const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-            return { dir: d.name, name: pkg.name, description: pkg.description || '' };
+            return { dir: d.name, ...pluginMetadata(pkg) };
         })
         .filter(Boolean);
 }
 
-// Plugins live in <consolioDir>/plugins/ as a real npm project (its own package.json +
-// node_modules), so `npm install <name>` there is just... npm install. Enabled/disabled
-// state isn't something npm tracks, so that lives in a small sidecar manifest.json.
 export function getPluginsDir(storage) {
     return join(storage.consolioDir, 'plugins');
 }
@@ -62,17 +62,15 @@ export function listInstalledPlugins(storage) {
     ensurePluginsProject(dir);
     const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     const manifest = readManifest(dir);
-    return Object.entries(pkg.dependencies || {}).map(([name, version]) => ({
-        name, version, enabled: manifest.enabled[name] !== false, // default enabled once installed
-    }));
+    return Object.entries(pkg.dependencies || {}).map(([name, version]) => {
+        const installedPkgPath = join(dir, 'node_modules', name, 'package.json');
+        const bundledPlugin = listBundledPlugins().find(plugin => plugin.name === name);
+        let installedPkg = { name, version };
+        try { installedPkg = JSON.parse(readFileSync(installedPkgPath, 'utf8')); } catch { }
+        return { ...pluginMetadata({ ...bundledPlugin, ...installedPkg }, name), name, version: installedPkg.version || version, enabled: manifest.enabled[name] !== false };
+    });
 }
 
-// Windows can't spawn npm's .cmd shim without shell:true (Node refuses EINVAL otherwise),
-// and shell:true does NOT escape array args — it concatenates them into a shell command
-// line. Since this server's CORS is wide open, any page the user visits could POST here,
-// so `name` MUST be constrained to npm's own package-name character set before it ever
-// reaches a shell. A local filesystem path (used in tests/dev) is exempt from this check —
-// only the HTTP route needs to enforce it, since that's the actual attack surface.
 const VALID_PACKAGE_NAME = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 export function isValidPackageName(name) {
     return typeof name === 'string' && VALID_PACKAGE_NAME.test(name);
@@ -88,9 +86,6 @@ export async function installPlugin(storage, name) {
     ensurePluginsProject(dir);
     const before = readDependencyNames(dir);
     await execFileAsync(NPM_CMD, ['install', '--prefix', dir, '--no-audit', '--no-fund', name], { timeout: 120000, shell: process.platform === 'win32' });
-    // `name` may be a local path (used by tests) rather than the installed package's own
-    // name — npm records the package's declared name as the dependency key regardless, so
-    // diff the dependency list to find what was actually added instead of trusting `name`.
     const after = readDependencyNames(dir);
     const installedName = [...after].find(n => !before.has(n)) ?? name;
     const manifest = readManifest(dir);
@@ -99,8 +94,6 @@ export async function installPlugin(storage, name) {
     return listInstalledPlugins(storage).find(p => p.name === installedName);
 }
 
-// `dirName` must match one of listBundledPlugins()'s own `dir` values — it's checked against
-// that server-enumerated list, never used as a raw path, so a route can expose this safely.
 export async function installBundledPlugin(storage, dirName) {
     const bundled = listBundledPlugins().find(p => p.dir === dirName);
     if (!bundled) throw new Error('Unknown bundled plugin');
@@ -124,29 +117,50 @@ export function setPluginEnabled(storage, name, enabled) {
     writeManifest(dir, manifest);
 }
 
-// Dynamically imports every enabled plugin's entry point and collects its hooks.
-// Node caches ES module imports by resolved URL, so re-calling this per request is cheap
-// after the first load — no separate cache layer needed.
 export async function loadEnabledPlugins(storage) {
     const dir = getPluginsDir(storage);
     const installed = listInstalledPlugins(storage).filter(p => p.enabled);
-    const hooks = { requestHooks: [], responseHooks: [], templateTags: {} };
+    const hooks = { requestHooks: [], responseHooks: [], templateTags: {}, paneTabs: { request: [], response: [] }, pluginMeta: {} };
 
-    for (const { name } of installed) {
+    for (const installedPlugin of installed) {
+        const { name } = installedPlugin;
         try {
             const pkgPath = join(dir, 'node_modules', name, 'package.json');
             const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
             const entry = join(dir, 'node_modules', name, pkg.main || 'index.js');
             const mod = await import(pathToFileURL(entry).href);
             const plugin = mod.default || mod;
+            hooks.pluginMeta[name] = pluginMetadata({ ...installedPlugin, ...pkg }, name);
             if (Array.isArray(plugin.requestHooks)) hooks.requestHooks.push(...plugin.requestHooks);
             if (Array.isArray(plugin.responseHooks)) hooks.responseHooks.push(...plugin.responseHooks);
             if (plugin.templateTags && typeof plugin.templateTags === 'object') Object.assign(hooks.templateTags, plugin.templateTags);
+            for (const pane of ['request', 'response']) {
+                const tabs = plugin.paneTabs?.[pane];
+                if (!Array.isArray(tabs)) continue;
+                for (const tab of tabs) {
+                    if (typeof tab?.id !== 'string' || typeof tab?.label !== 'string' || typeof tab?.render !== 'function') continue;
+                    hooks.paneTabs[pane].push({ plugin: name, ...tab });
+                }
+            }
         } catch (e) {
             console.error(`[plugins] Failed to load "${name}": ${e.message}`);
         }
     }
     return hooks;
+}
+
+export function listPaneTabs(hooks) {
+    return {
+        request: (hooks.paneTabs?.request || []).map(({ plugin, id, label }) => ({ plugin, id, label, pluginInfo: hooks.pluginMeta?.[plugin] })),
+        response: (hooks.paneTabs?.response || []).map(({ plugin, id, label }) => ({ plugin, id, label, pluginInfo: hooks.pluginMeta?.[plugin] })),
+        plugins: hooks.pluginMeta || {},
+    };
+}
+
+export async function renderPaneTab(hooks, { pane, plugin, id, context }) {
+    const tab = hooks.paneTabs?.[pane]?.find(item => item.plugin === plugin && item.id === id);
+    if (!tab) throw new Error('Unknown plugin pane tab');
+    return tab.render(context);
 }
 
 export async function runRequestHooks(hooks, request) {
@@ -167,8 +181,6 @@ export async function runResponseHooks(hooks, response) {
     return current;
 }
 
-// Resolves {{% tagName %}} using plugin-provided template tag functions — a second,
-// separate syntax from the existing {{VAR}} environment-variable substitution.
 export function applyTemplateTags(str, templateTags) {
     if (typeof str !== 'string' || !str.includes('{{%')) return str;
     return str.replace(/\{\{%\s*(\w+)\s*%\}\}/g, (match, tagName) => {

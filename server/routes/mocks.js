@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import Fastify from 'fastify';
 
-// mockId -> { fastify, port } — one lightweight Fastify instance per started mock set.
 const runningMocks = new Map();
 
 function applyTemplate(str, vars) {
@@ -24,7 +23,6 @@ async function startMock(mock) {
             url: route.path,
             handler: async (req, reply) => {
                 if (route.delayMs) await new Promise(r => setTimeout(r, route.delayMs));
-                // {{name}} in headers/body resolves against path params first, then query string.
                 const vars = { ...req.query, ...req.params };
 
                 reply.status(route.statusCode || 200);
@@ -34,8 +32,6 @@ async function startMock(mock) {
 
                 const raw = route.body || '';
                 try {
-                    // Templating a parsed JSON body preserves types (numbers/booleans stay
-                    // non-strings); only falls back to raw string templating for non-JSON bodies.
                     const parsed = JSON.parse(raw);
                     if (!reply.getHeader('content-type')) reply.header('Content-Type', 'application/json');
                     return reply.send(JSON.stringify(applyTemplateDeep(parsed, vars)));

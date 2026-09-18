@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { useStore, apiFetch } from '../../store'
+import { cn } from '@/lib/utils'
+import { X, Plus, Terminal, Code2, Save, Zap, Send, Upload, Sparkles } from 'lucide-react'
 import { Icon, IconBtn, KVTable, FormGroup, Input, Select, Empty, Btn, JsonTree, Spinner } from '../shared'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { PluginTabButton, PluginTabContent } from '../shared/PluginTab'
+import {
+  Select as ShSelect, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectSeparator,
+} from '@/components/ui/select'
 import { uid, buildCurl } from '../../utils'
-import styles from './RequestPane.module.css'
-import sharedStyles from '../shared/Shared.module.css'
 
 const GRAPHQL_INTROSPECTION_QUERY = `query IntrospectionQuery { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }`
 
@@ -34,6 +40,7 @@ export function RequestPane() {
   const loadGrpcProto = useStore(s => s.loadGrpcProto)
   const callGrpc      = useStore(s => s.callGrpc)
   const disconnectGrpc = useStore(s => s.disconnectGrpc)
+  const pluginTabs = useStore(s => s.pluginTabs?.request || [])
 
   const isWs   = tab.wsMode
   const isSse  = tab.sseMode
@@ -84,58 +91,70 @@ export function RequestPane() {
   const testBadgeClass = (() => {
     const r = tab.testResults || []
     if (!r.length) return ''
-    return r.filter(x => !x.pass && x.ran).length > 0 ? styles.badgeFail : styles.badgePass
+    return r.filter(x => !x.pass && x.ran).length > 0 ? 'bg-[var(--err-dim)] text-[var(--err)]' : 'bg-[var(--ok-dim)] text-[var(--ok)]'
   })()
 
+  const connecting = isWs ? tab.wsConnected : isSse ? tab.sseConnected : isSio ? tab.sioConnected : isGrpc ? tab.grpcConnected : tab.loading
+  const requestPluginTab = pluginTabs.find(pluginTab => `plugin:${pluginTab.plugin}:${pluginTab.id}` === tab.reqTab)
+
   return (
-    <div className={styles.wrap}>
+    <div className="flex h-full flex-col overflow-hidden bg-background">
       {/* ── Multi-tab strip ─────────────────────────────────────────────── */}
-      <div className={styles.tabStrip}>
-        {tabs.map(t => (
-          <div
-            key={t.id}
-            className={`${styles.tabItem} ${t.id === activeTabId ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            <span className={styles.tabMethod} style={{ color: METHOD_COLORS[t.method] || 'var(--tx-muted)' }}>
-              {t.method}
-            </span>
-            <span className={styles.tabName}>{t.reqName || t.url || 'New Request'}</span>
-            <button
-              className={styles.tabClose}
-              onClick={e => { e.stopPropagation(); closeTab(t.id) }}
-              title="Close tab"
+      <div className="flex min-h-[var(--tabbar-h)] shrink-0 items-stretch overflow-x-auto border-b border-[var(--bd-faint)] bg-[var(--bg-surface)]">
+        {tabs.map(t => {
+          const active = t.id === activeTabId
+          return (
+            <div
+              key={t.id}
+              className={cn(
+                'group flex min-w-0 max-w-[200px] shrink-0 items-center gap-1.5 border-r border-[var(--bd-faint)] px-3 text-[11.5px] text-[var(--tx-faint)] transition-colors cursor-pointer',
+                active ? 'border-b-2 border-b-primary bg-[var(--bg-raised)] text-foreground' : 'hover:bg-[var(--bg-raised)] hover:text-muted-foreground'
+              )}
+              onClick={() => setActiveTab(t.id)}
             >
-              <Icon name="x" size={9} />
-            </button>
-          </div>
-        ))}
-        <button className={styles.tabAdd} onClick={() => newTab()} title="New tab">
-          <Icon name="plus" size={12} />
+              <span className="shrink-0 font-mono text-[9px] font-bold" style={{ color: METHOD_COLORS[t.method] || 'var(--tx-muted)' }}>
+                {t.method}
+              </span>
+              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{t.reqName || t.url || 'New Request'}</span>
+              <button
+                className={cn(
+                  'flex size-3.5 shrink-0 items-center justify-center rounded-[2px] text-[var(--tx-faint)] opacity-0 transition-opacity hover:bg-[var(--bg-overlay)] hover:text-destructive group-hover:opacity-100',
+                  active && 'opacity-100'
+                )}
+                onClick={e => { e.stopPropagation(); closeTab(t.id) }}
+                title="Close tab"
+              >
+                <X size={9} />
+              </button>
+            </div>
+          )
+        })}
+        <button className="flex w-[34px] shrink-0 items-center justify-center text-[var(--tx-faint)] transition-colors hover:text-primary" onClick={() => newTab()} title="New tab">
+          <Plus size={12} />
         </button>
       </div>
 
       {/* ── URL bar ─────────────────────────────────────────────────────── */}
-      <div className={styles.urlBar}>
-        <select
-          className={styles.methodSelect}
-          value={currentReqType}
-          onChange={e => selectReqType(e.target.value)}
-          style={{ color: (isWs || isSse || isSio || isGrpc) ? 'var(--accent)' : (METHOD_COLORS[tab.method] || 'var(--tx-base)') }}
-        >
-          <optgroup label="HTTP">
-            {HTTP_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-          </optgroup>
-          <optgroup label="Protocols">
-            <option value="WS">WebSocket</option>
-            <option value="SSE">SSE</option>
-            <option value="SIO">Socket.IO</option>
-            <option value="GRPC">gRPC</option>
-          </optgroup>
-        </select>
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-[var(--bd-faint)] bg-[var(--bg-surface)] px-3 py-2">
+        <ShSelect value={currentReqType} onValueChange={selectReqType}>
+          <SelectTrigger
+            className="w-[104px] justify-center border-[var(--bd-subtle)] bg-[var(--bg-raised)] font-mono text-[11.5px] font-bold"
+            style={{ color: (isWs || isSse || isSio || isGrpc) ? 'var(--accent)' : (METHOD_COLORS[tab.method] || 'var(--tx-base)') }}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {HTTP_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            <SelectSeparator />
+            <SelectItem value="WS">WebSocket</SelectItem>
+            <SelectItem value="SSE">SSE</SelectItem>
+            <SelectItem value="SIO">Socket.IO</SelectItem>
+            <SelectItem value="GRPC">gRPC</SelectItem>
+          </SelectContent>
+        </ShSelect>
 
         <input
-          className={styles.urlInput}
+          className="h-8 flex-1 rounded-md border border-[var(--bd-subtle)] bg-[var(--bg-raised)] px-3 font-mono text-[12.5px] text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-[var(--tx-faint)] focus:border-primary focus:shadow-[0_0_0_3px_var(--accent-dim)]"
           placeholder="https://api.example.com/endpoint  •  use {{VAR}} for env vars, or ws(s):// for WebSocket"
           value={tab.url}
           onChange={e => ut({ url: e.target.value })}
@@ -144,61 +163,38 @@ export function RequestPane() {
 
         {!isWs && !isSse && !isSio && !isGrpc && (
           <>
-            <button className={styles.curlBtn} onClick={copyCurl} title="Copy as cURL">
-              <Icon name="terminal" size={13} />
-            </button>
-            <button className={styles.curlBtn} onClick={() => useStore.setState({ modal: 'codegen' })} title="Generate code snippet">
-              <Icon name="code" size={13} />
-            </button>
+            <Button variant="outline" size="icon" className="size-8 border-[var(--bd-subtle)] bg-[var(--bg-raised)]" onClick={copyCurl} title="Copy as cURL">
+              <Terminal size={13} />
+            </Button>
+            <Button variant="outline" size="icon" className="size-8 border-[var(--bd-subtle)] bg-[var(--bg-raised)]" onClick={() => useStore.setState({ modal: 'codegen' })} title="Generate code snippet">
+              <Code2 size={13} />
+            </Button>
           </>
         )}
-        <button className={styles.saveBtn} onClick={saveRequest} title="Save request">
-          <Icon name="save" size={13} />
-        </button>
+        <Button variant="outline" size="icon" className="size-8 border-[var(--bd-subtle)] bg-[var(--bg-raised)]" onClick={saveRequest} title="Save request">
+          <Save size={13} />
+        </Button>
         {isWs ? (
-          <button
-            className={`${styles.sendBtn} ${tab.wsConnected ? styles.sending : ''}`}
-            onClick={() => tab.wsConnected ? disconnectWs() : connectWs(tab.url)}
-          >
-            {tab.wsConnected ? <><Icon name="x" size={13} /> Disconnect</> : <><Icon name="zap" size={13} /> Connect</>}
-          </button>
+          <SendButton connecting={tab.wsConnected} onClick={() => tab.wsConnected ? disconnectWs() : connectWs(tab.url)} connectedLabel="Disconnect" idleLabel="Connect" />
         ) : isSse ? (
-          <button
-            className={`${styles.sendBtn} ${tab.sseConnected ? styles.sending : ''}`}
-            onClick={() => tab.sseConnected ? disconnectSse() : connectSse(tab.url)}
-          >
-            {tab.sseConnected ? <><Icon name="x" size={13} /> Disconnect</> : <><Icon name="zap" size={13} /> Connect</>}
-          </button>
+          <SendButton connecting={tab.sseConnected} onClick={() => tab.sseConnected ? disconnectSse() : connectSse(tab.url)} connectedLabel="Disconnect" idleLabel="Connect" />
         ) : isSio ? (
-          <button
-            className={`${styles.sendBtn} ${tab.sioConnected ? styles.sending : ''}`}
-            onClick={() => tab.sioConnected ? disconnectSio() : connectSio(tab.url)}
-          >
-            {tab.sioConnected ? <><Icon name="x" size={13} /> Disconnect</> : <><Icon name="zap" size={13} /> Connect</>}
-          </button>
+          <SendButton connecting={tab.sioConnected} onClick={() => tab.sioConnected ? disconnectSio() : connectSio(tab.url)} connectedLabel="Disconnect" idleLabel="Connect" />
         ) : isGrpc ? (
-          <button
-            className={`${styles.sendBtn} ${tab.grpcConnected ? styles.sending : ''}`}
-            onClick={() => tab.grpcConnected ? disconnectGrpc() : callGrpc()}
-          >
-            {tab.grpcConnected ? <><Icon name="x" size={13} /> Cancel</> : <><Icon name="zap" size={13} /> Call</>}
-          </button>
+          <SendButton connecting={tab.grpcConnected} onClick={() => tab.grpcConnected ? disconnectGrpc() : callGrpc()} connectedLabel="Cancel" idleLabel="Call" />
         ) : (
-          <button
-            className={`${styles.sendBtn} ${tab.loading ? styles.sending : ''}`}
+          <Button
+            className="h-8 gap-1.5 rounded-md bg-primary px-4 text-[12.5px] font-bold text-primary-foreground hover:bg-[var(--accent-hover)] active:scale-[.97] disabled:pointer-events-none disabled:border disabled:border-[var(--bd-subtle)] disabled:bg-[var(--bg-raised)] disabled:text-muted-foreground disabled:opacity-100"
             onClick={sendRequest}
             disabled={tab.loading}
           >
-            {tab.loading
-              ? <><span className={styles.spinner} /> Sending…</>
-              : <><Icon name="send" size={13} /> Send</>
-            }
-          </button>
+            {tab.loading ? <><Spinner size={12} /> Sending…</> : <><Send size={13} /> Send</>}
+          </Button>
         )}
       </div>
 
       {/* ── Request sub-tabs ────────────────────────────────────────────── */}
-      <div className={styles.reqTabs}>
+      <div className="flex shrink-0 items-center overflow-x-auto border-b border-[var(--bd-faint)] bg-[var(--bg-surface)] px-3">
         {[
           { key: 'info',    label: 'Info',      badge: tab.description ? '●' : null },
           { key: 'params',  label: 'Params',   badge: countEnabled(tab.params)  || null },
@@ -211,19 +207,26 @@ export function RequestPane() {
         ].map(({ key, label, badge, badgeClass }) => (
           <button
             key={key}
-            className={`${styles.reqTab} ${tab.reqTab === key ? styles.reqTabActive : ''}`}
+            className={cn(
+              'mb-[-1px] flex items-center gap-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-2 text-[12px] text-[var(--tx-faint)] transition-colors hover:text-muted-foreground',
+              tab.reqTab === key && 'border-b-primary text-foreground'
+            )}
             onClick={() => ut({ reqTab: key })}
           >
             {label}
             {badge !== null && badge !== undefined && (
-              <span className={`${styles.badge} ${badgeClass || ''}`}>{badge}</span>
+              <span className={cn('rounded-full bg-[var(--bg-overlay)] px-1.5 py-px font-mono text-[10px] text-[var(--tx-faint)]', badgeClass)}>{badge}</span>
             )}
           </button>
         ))}
-        <div className={styles.reqTabSpacer} />
+        {pluginTabs.map(pluginTab => {
+          const key = `plugin:${pluginTab.plugin}:${pluginTab.id}`
+          return <PluginTabButton key={key} tab={pluginTab} active={tab.reqTab === key} onClick={() => ut({ reqTab: key })} />
+        })}
+        <div className="flex-1" />
         {tab.activeReq && (
           <input
-            className={styles.reqNameInput}
+            className="max-w-[160px] bg-transparent pr-1 text-right font-mono text-[11px] text-[var(--tx-faint)] outline-none focus:text-foreground"
             value={tab.reqName || ''}
             onChange={e => ut({ reqName: e.target.value })}
             placeholder="Request name…"
@@ -232,7 +235,7 @@ export function RequestPane() {
       </div>
 
       {/* ── Panel content ───────────────────────────────────────────────── */}
-      <div className={styles.panel}>
+      <div className="flex flex-1 flex-col overflow-hidden">
         {isGrpc && (
           <GrpcPanel tab={tab} ut={ut} loadGrpcProto={loadGrpcProto} />
         )}
@@ -250,8 +253,26 @@ export function RequestPane() {
         {!isGrpc && tab.reqTab === 'pre'     && <ScriptPanel  code={tab.preScript}   onChange={v => ut({ preScript: v })}   type="pre"  logs={tab.preLogs} />}
         {!isGrpc && tab.reqTab === 'post'    && <ScriptPanel  code={tab.postScript}  onChange={v => ut({ postScript: v })}  type="post" logs={tab.postLogs} />}
         {!isGrpc && tab.reqTab === 'tests'   && <TestsPanel   tests={tab.tests}      onChange={v => ut({ tests: v })}       results={tab.testResults} />}
+        {requestPluginTab && <PluginTabContent pane="request" tab={requestPluginTab} context={{ request: tab }} />}
       </div>
     </div>
+  )
+}
+
+/* ── Send/connect button (WS/SSE/SIO/gRPC) ───────────────────────────────── */
+function SendButton({ connecting, onClick, connectedLabel, idleLabel }) {
+  return (
+    <Button
+      onClick={onClick}
+      className={cn(
+        'h-8 gap-1.5 rounded-md px-4 text-[12.5px] font-bold',
+        connecting
+          ? 'pointer-events-none border border-[var(--bd-subtle)] bg-[var(--bg-raised)] text-muted-foreground'
+          : 'bg-primary text-primary-foreground hover:bg-[var(--accent-hover)] active:scale-[.97]'
+      )}
+    >
+      {connecting ? <><X size={13} /> {connectedLabel}</> : <><Zap size={13} /> {idleLabel}</>}
+    </Button>
   )
 }
 
@@ -265,12 +286,15 @@ function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, envi
     if (t === 'graphql' && method !== 'POST') setMethod('POST')
   }
   return (
-    <div className={styles.bodyWrap}>
-      <div className={styles.bodyTypeBar}>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 gap-0.5 border-b border-[var(--bd-faint)] px-3 py-1.5">
         {TYPES.map(t => (
           <button
             key={t}
-            className={`${styles.bodyType} ${body.type === t ? styles.bodyTypeActive : ''}`}
+            className={cn(
+              'rounded-sm px-2.5 py-1 text-[11px] text-[var(--tx-faint)] transition-colors hover:bg-[var(--bg-raised)] hover:text-muted-foreground',
+              body.type === t && 'bg-[var(--accent-dim)] text-primary! hover:text-primary!'
+            )}
             onClick={() => selectType(t)}
           >
             {LABELS[t] || (t.charAt(0).toUpperCase() + t.slice(1))}
@@ -285,8 +309,8 @@ function BodyPanel({ body, onChange, method, setMethod, url, headers, auth, envi
         <MultipartTable rows={body.fields || []} onChange={v => set('fields', v)} />
       )}
       {['json', 'text', 'raw'].includes(body.type) && (
-        <textarea
-          className={styles.codeArea}
+        <Textarea
+          className="flex-1 resize-none rounded-none border-none bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.65] shadow-none focus-visible:ring-0"
           placeholder={body.type === 'json' ? '{\n  "key": "value"\n}' : 'Body content…'}
           value={body.content || ''}
           onChange={e => set('content', e.target.value)}
@@ -326,29 +350,29 @@ function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
   }
 
   return (
-    <div className={styles.graphqlWrap}>
-      <div className={styles.graphqlLabel}>Query</div>
-      <textarea
-        className={styles.codeArea}
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 px-3 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Query</div>
+      <Textarea
+        className="flex-1 resize-none rounded-none border-none bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.65] shadow-none focus-visible:ring-0"
         placeholder={'query {\n  \n}'}
         value={body.query || ''}
         onChange={e => set('query', e.target.value)}
       />
-      <div className={styles.graphqlLabel}>Variables (JSON)</div>
-      <textarea
-        className={styles.codeArea}
+      <div className="shrink-0 px-3 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Variables (JSON)</div>
+      <Textarea
+        className="resize-none rounded-none border-none bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.65] shadow-none focus-visible:ring-0"
         style={{ minHeight: 70 }}
         placeholder="{}"
         value={body.variables || ''}
         onChange={e => set('variables', e.target.value)}
       />
-      <div className={styles.graphqlSchemaBar}>
+      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--bd-faint)] px-3 py-2">
         <Btn variant="ghost" size="sm" onClick={fetchSchema} disabled={loading || !url}>
           {loading ? 'Loading schema…' : 'Fetch Schema'}
         </Btn>
-        {error && <span className={styles.graphqlSchemaError}>{error}</span>}
+        {error && <span className="text-[11px] text-destructive">{error}</span>}
       </div>
-      {schema && <div className={styles.graphqlSchemaTree}><JsonTree value={schema} /></div>}
+      {schema && <div className="max-h-[240px] shrink-0 overflow-y-auto border-t border-[var(--bd-faint)]"><JsonTree value={schema} /></div>}
     </div>
   )
 }
@@ -358,38 +382,37 @@ function GraphQLPanel({ body, onChange, url, headers, auth, environment }) {
    methods are supported — client-streaming/bidi is rejected server-side.    */
 function GrpcPanel({ tab, ut, loadGrpcProto }) {
   return (
-    <div className={styles.graphqlWrap}>
-      <div className={styles.graphqlLabel}>.proto file</div>
-      <textarea
-        className={styles.codeArea}
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 px-3 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">.proto file</div>
+      <Textarea
+        className="resize-none rounded-none border-none bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.65] shadow-none focus-visible:ring-0"
         style={{ minHeight: 100 }}
         placeholder={'syntax = "proto3";\npackage demo;\n\nservice Greeter {\n  rpc SayHello (HelloRequest) returns (HelloReply) {}\n}\n\nmessage HelloRequest { string name = 1; }\nmessage HelloReply { string message = 1; }'}
         value={tab.grpcProtoText}
         onChange={e => ut({ grpcProtoText: e.target.value })}
       />
-      <div className={styles.graphqlSchemaBar}>
+      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--bd-faint)] px-3 py-2">
         <Btn variant="ghost" size="sm" onClick={loadGrpcProto} disabled={!tab.grpcProtoText?.trim()}>
           Load Proto
         </Btn>
         {tab.grpcMethods?.length > 0 && (
-          <select
-            className={sharedStyles.formSelect}
-            style={{ flex: 1 }}
-            value={tab.grpcMethodPath}
-            onChange={e => ut({ grpcMethodPath: e.target.value })}
-          >
-            <option value="">Select a method…</option>
-            {tab.grpcMethods.map(m => (
-              <option key={m.path} value={m.path}>
-                {m.path}{m.responseStream ? ' (server-streaming)' : ''}
-              </option>
-            ))}
-          </select>
+          <ShSelect value={tab.grpcMethodPath} onValueChange={v => ut({ grpcMethodPath: v })}>
+            <SelectTrigger className="flex-1 border-[var(--bd-subtle)] bg-[var(--bg-raised)] font-mono">
+              <SelectValue placeholder="Select a method…" />
+            </SelectTrigger>
+            <SelectContent>
+              {tab.grpcMethods.map(m => (
+                <SelectItem key={m.path} value={m.path}>
+                  {m.path}{m.responseStream ? ' (server-streaming)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </ShSelect>
         )}
       </div>
-      <div className={styles.graphqlLabel}>Request (JSON)</div>
-      <textarea
-        className={styles.codeArea}
+      <div className="shrink-0 px-3 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Request (JSON)</div>
+      <Textarea
+        className="resize-none rounded-none border-none bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.65] shadow-none focus-visible:ring-0"
         style={{ minHeight: 90 }}
         placeholder={'{\n  "name": "World"\n}'}
         value={tab.grpcRequestJson}
@@ -417,24 +440,24 @@ function MultipartTable({ rows, onChange }) {
   }
 
   return (
-    <div className={sharedStyles.kvWrap}>
-      <div className={sharedStyles.kvTable}>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 overflow-y-auto">
         {rows.map((r, i) => (
-          <div key={r.id || i} className={styles.multipartRow}>
+          <div key={r.id || i} className="flex items-center gap-1.5 border-b border-[var(--bd-faint)] px-2.5 py-1 hover:bg-[var(--bg-raised)]">
             <input
               type="checkbox"
-              className={sharedStyles.kvCheck}
+              className="size-3.5 shrink-0 accent-[var(--accent)]"
               checked={r.enabled}
               onChange={e => update(i, { enabled: e.target.checked })}
             />
             <input
-              className={sharedStyles.kvInput}
+              className="flex-1 rounded-sm border border-transparent bg-transparent px-1.5 py-1 font-mono text-[11.5px] text-foreground outline-none focus:border-[var(--bd-base)] focus:bg-[var(--bg-overlay)]"
               placeholder="Field"
               value={r.key || ''}
               onChange={e => update(i, { key: e.target.value })}
             />
             <select
-              className={styles.multipartType}
+              className="w-16 shrink-0 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-overlay)] px-1.5 py-1 text-[11px] text-muted-foreground"
               value={r.type || 'text'}
               onChange={e => update(i, { type: e.target.value, value: '', fileName: undefined, fileType: undefined, fileData: undefined })}
             >
@@ -442,39 +465,38 @@ function MultipartTable({ rows, onChange }) {
               <option value="file">File</option>
             </select>
             {r.type === 'file' ? (
-              <label className={styles.filePicker}>
-                <Icon name="upload" size={12} />
-                <span className={styles.filePickerLabel}>
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm border border-dashed border-[var(--bd-base)] px-2 py-1 text-[11.5px] text-[var(--tx-faint)] transition-colors hover:border-primary hover:text-primary">
+                <Upload size={12} />
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap">
                   {r.fileName || 'Choose file…'}
                 </span>
                 <input
                   type="file"
-                  className={styles.fileInputHidden}
+                  className="hidden"
                   onChange={e => readFile(i, e.target.files?.[0])}
                 />
               </label>
             ) : (
               <input
-                className={sharedStyles.kvInput}
+                className="flex-1 rounded-sm border border-transparent bg-transparent px-1.5 py-1 font-mono text-[11.5px] text-foreground outline-none focus:border-[var(--bd-base)] focus:bg-[var(--bg-overlay)]"
                 placeholder="Value"
                 value={r.value || ''}
                 onChange={e => update(i, { value: e.target.value })}
               />
             )}
-            <button className={styles.iconBtnDangerRow} onClick={() => del(i)}>
-              <Icon name="x" size={11} />
+            <button className="flex size-5 shrink-0 items-center justify-center rounded-sm text-[var(--tx-faint)] transition-colors hover:bg-[var(--bg-overlay)] hover:text-destructive" onClick={() => del(i)}>
+              <X size={11} />
             </button>
           </div>
         ))}
       </div>
-      <button className={sharedStyles.addRowBtn} onClick={add}>
-        <Icon name="plus" size={11} /> Add Row
+      <button className="m-1.5 flex items-center gap-1 rounded-sm border border-dashed border-[var(--bd-subtle)] px-2.5 py-1 text-[11px] text-[var(--tx-faint)] transition-colors hover:border-primary hover:text-primary" onClick={add}>
+        <Plus size={11} /> Add Row
       </button>
     </div>
   )
 }
 
-/* ── Auth panel ───────────────────────────────────────────────────────────── */
 /* ── Info panel (description + AI-assisted suggestions) ─────────────────────── */
 function InfoPanel({ tab, ut }) {
   const aiConfig    = useStore(s => s.aiConfig)
@@ -523,10 +545,9 @@ function InfoPanel({ tab, ut }) {
   }
 
   return (
-    <div className={styles.infoWrap}>
+    <div className="flex flex-col gap-3 overflow-y-auto p-4">
       <FormGroup label="Description">
-        <textarea
-          className={styles.codeArea}
+        <Textarea
           style={{ minHeight: 70 }}
           placeholder="What does this request do? When should someone use it?"
           value={tab.description || ''}
@@ -534,33 +555,33 @@ function InfoPanel({ tab, ut }) {
         />
       </FormGroup>
 
-      <div className={styles.aiSuggestBar}>
+      <div className="flex flex-wrap items-center gap-2.5">
         <Btn variant="ghost" size="sm" onClick={requestSuggestion} disabled={!canSuggest || suggesting}>
-          {suggesting ? <Spinner size={12} /> : <><Icon name="sparkle" size={12} /> Fix with AI</>}
+          {suggesting ? <Spinner size={12} /> : <><Sparkles size={12} /> Fix with AI</>}
         </Btn>
-        {!tab.activeReq && <span className={styles.scriptHint}>Save this request to a collection first.</span>}
+        {!tab.activeReq && <span className="text-[11px] leading-[1.65] text-[var(--tx-faint)]">Save this request to a collection first.</span>}
         {tab.activeReq && !isConfigured && (
-          <span className={styles.scriptHint}>
-            Set up a provider in <button className={styles.aiSettingsLink} onClick={() => useStore.setState({ modal: 'settings' })}>Settings</button> to enable AI suggestions.
+          <span className="text-[11px] leading-[1.65] text-[var(--tx-faint)]">
+            Set up a provider in <button className="cursor-pointer border-none bg-none p-0 text-inherit text-primary underline" onClick={() => useStore.setState({ modal: 'settings' })}>Settings</button> to enable AI suggestions.
           </span>
         )}
       </div>
 
-      {error && <p className={styles.aiError}>{error}</p>}
+      {error && <p className="m-0 text-[11.5px] text-destructive">{error}</p>}
 
       {suggestion && (
-        <div className={styles.aiSuggestBox}>
-          <p className={styles.aiSuggestLabel}>Suggested description</p>
-          <p className={styles.aiSuggestText}>{suggestion.description}</p>
+        <div className="flex flex-col gap-1.5 rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-overlay)] p-3.5">
+          <p className="m-0 mt-1 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Suggested description</p>
+          <p className="m-0 text-[12.5px] leading-[1.5] text-foreground">{suggestion.description}</p>
           {suggestion.tests.length > 0 && (
             <>
-              <p className={styles.aiSuggestLabel}>Suggested tests</p>
-              <ul className={styles.aiSuggestTests}>
+              <p className="m-0 mt-1 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Suggested tests</p>
+              <ul className="m-0 pl-4.5 font-mono text-[12px] text-muted-foreground">
                 {suggestion.tests.map((t, i) => <li key={i}>{t.type}{t.value ? `: ${t.value}` : ''}</li>)}
               </ul>
             </>
           )}
-          <div className={styles.aiSuggestActions}>
+          <div className="mt-1.5 flex justify-end gap-2">
             <Btn variant="ghost" size="sm" onClick={() => setSuggestion(null)}>Discard</Btn>
             <Btn variant="primary" size="sm" onClick={applySuggestion}>Apply</Btn>
           </div>
@@ -574,14 +595,19 @@ function InfoPanel({ tab, ut }) {
 function AuthPanel({ auth, onChange }) {
   const set = (k, v) => onChange({ ...auth, [k]: v })
   return (
-    <div className={styles.authWrap}>
+    <div className="flex flex-col gap-3 overflow-y-auto p-4">
       <FormGroup label="Auth type">
-        <Select value={auth.type || 'none'} onChange={e => set('type', e.target.value)} className={styles.authSelect}>
-          <option value="none">No Auth</option>
-          <option value="bearer">Bearer Token</option>
-          <option value="basic">Basic Auth</option>
-          <option value="apikey">API Key</option>
-        </Select>
+        <ShSelect value={auth.type || 'none'} onValueChange={v => set('type', v)}>
+          <SelectTrigger className="w-full max-w-[220px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Auth</SelectItem>
+            <SelectItem value="bearer">Bearer Token</SelectItem>
+            <SelectItem value="basic">Basic Auth</SelectItem>
+            <SelectItem value="apikey">API Key</SelectItem>
+          </SelectContent>
+        </ShSelect>
       </FormGroup>
       {auth.type === 'bearer' && (
         <FormGroup label="Token">
@@ -604,10 +630,15 @@ function AuthPanel({ auth, onChange }) {
           <Input value={auth.value || ''} onChange={e => set('value', e.target.value)} />
         </FormGroup>
         <FormGroup label="Send in">
-          <Select value={auth.placement || 'header'} onChange={e => set('placement', e.target.value)} className={styles.authSelect}>
-            <option value="header">Header</option>
-            <option value="query">Query param</option>
-          </Select>
+          <ShSelect value={auth.placement || 'header'} onValueChange={v => set('placement', v)}>
+            <SelectTrigger className="w-full max-w-[220px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="header">Header</SelectItem>
+              <SelectItem value="query">Query param</SelectItem>
+            </SelectContent>
+          </ShSelect>
         </FormGroup>
       </>}
     </div>
@@ -617,25 +648,24 @@ function AuthPanel({ auth, onChange }) {
 /* ── Script panel ─────────────────────────────────────────────────────────── */
 function ScriptPanel({ code, onChange, type, logs }) {
   return (
-    <div className={styles.scriptWrap}>
-      <div className={styles.scriptHint}>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-[var(--bd-faint)] bg-[var(--bg-surface)] px-3.5 py-2 text-[11px] leading-[1.65] text-[var(--tx-faint)]">
         {type === 'pre'
           ? 'Runs before the request. '
           : 'Runs after the response. Access response.status / .body / .headers. '}
-        Available: <code className={styles.scriptCode}>consolio.log()</code>,{' '}
-        <code className={styles.scriptCode}>consolio.setVariable(key, val)</code>,{' '}
-        <code className={styles.scriptCode}>consolio.getVariable(key)</code>
+        Available: <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">consolio.log()</code>,{' '}
+        <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">consolio.setVariable(key, val)</code>,{' '}
+        <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">consolio.getVariable(key)</code>
       </div>
-      <textarea
-        className={styles.codeArea}
-        style={{ flex: 1 }}
+      <Textarea
+        className="flex-1 resize-none rounded-none border-none bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.65] shadow-none focus-visible:ring-0"
         placeholder={`// ${type === 'pre' ? 'Pre-request' : 'Post-response'} script\nconsolio.log('status:', response?.status);\n// consolio.setVariable('token', JSON.parse(response.body).token);`}
         value={code || ''}
         onChange={e => onChange(e.target.value)}
       />
       {logs && logs.length > 0 && (
-        <div className={styles.scriptLogs}>
-          {logs.map((l, i) => <div key={i} className={styles.scriptLogLine}>› {l}</div>)}
+        <div className="max-h-20 shrink-0 overflow-y-auto border-t border-[var(--bd-faint)] bg-[var(--bg-surface)] px-3.5 py-2">
+          {logs.map((l, i) => <div key={i} className="mb-0.5 font-mono text-[11px] text-muted-foreground">› {l}</div>)}
         </div>
       )}
     </div>
@@ -648,27 +678,29 @@ function TestsPanel({ tests, onChange, results }) {
   const upd = (i, f, v) => onChange(tests.map((t, j) => j === i ? { ...t, [f]: v } : t))
   const del = i => onChange(tests.filter((_, j) => j !== i))
 
+  const DOT_COLOR = { pass: 'bg-[var(--ok)]', fail: 'bg-[var(--err)]', pending: 'bg-[var(--tx-faint)]' }
+
   return (
-    <div className={styles.testsWrap}>
-      <div className={styles.testsHeader}>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 gap-3 border-b border-[var(--bd-faint)] px-3.5 py-2 text-[12px]">
         {results?.length > 0
           ? <>
-              <span className={styles.passCount}>● {results.filter(r => r.pass).length} pass</span>
+              <span className="text-[var(--ok)]">● {results.filter(r => r.pass).length} pass</span>
               {'  '}
-              <span className={styles.failCount}>{results.filter(r => !r.pass && r.ran).length} fail</span>
+              <span className="text-destructive">{results.filter(r => !r.pass && r.ran).length} fail</span>
             </>
-          : <span style={{ color: 'var(--tx-faint)' }}>Assertions — evaluated on Send</span>
+          : <span className="text-[var(--tx-faint)]">Assertions — evaluated on Send</span>
         }
       </div>
-      <div className={styles.assertionList}>
+      <div className="flex-1 overflow-y-auto py-2">
         {(tests || []).map((t, i) => {
           const res   = results?.[i]
           const state = res ? (res.pass ? 'pass' : 'fail') : 'pending'
           return (
-            <div key={t.id || i} className={styles.assertRow}>
-              <span className={`${styles.assertDot} ${styles[`dot_${state}`]}`} />
+            <div key={t.id || i} className="flex items-center gap-1.5 border-b border-[var(--bd-faint)] px-3 py-1 hover:bg-[var(--bg-raised)]">
+              <span className={cn('size-1.5 shrink-0 rounded-full', DOT_COLOR[state])} />
               <select
-                className={styles.assertSel}
+                className="shrink-0 rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-raised)] px-1.5 py-1 text-[11px] text-muted-foreground focus:border-primary focus:outline-none"
                 value={t.type}
                 onChange={e => upd(i, 'type', e.target.value)}
               >
@@ -686,8 +718,7 @@ function TestsPanel({ tests, onChange, results }) {
               </select>
               {t.type === 'body_json_path' && (
                 <input
-                  className={styles.assertInput}
-                  style={{ width: 100 }}
+                  className="w-[100px] rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-raised)] px-1.5 py-1 font-mono text-[11px] text-foreground placeholder:text-[var(--tx-faint)] focus:border-primary focus:outline-none"
                   placeholder="e.g. data[0].id"
                   value={t.path || ''}
                   onChange={e => upd(i, 'path', e.target.value)}
@@ -695,7 +726,7 @@ function TestsPanel({ tests, onChange, results }) {
               )}
               {t.type !== 'body_not_empty' && (
                 <input
-                  className={styles.assertInput}
+                  className="flex-1 rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-raised)] px-1.5 py-1 font-mono text-[11px] text-foreground placeholder:text-[var(--tx-faint)] focus:border-primary focus:outline-none"
                   placeholder={
                     t.type === 'status' ? '200' :
                     t.type === 'status_in' ? '200,201,204' :
@@ -707,16 +738,16 @@ function TestsPanel({ tests, onChange, results }) {
                   onChange={e => upd(i, 'value', e.target.value)}
                 />
               )}
-              {res && <span className={styles.assertActual}>{res.actual}</span>}
-              <button className={styles.assertDel} onClick={() => del(i)}>
-                <Icon name="x" size={10} />
+              {res && <span className="shrink-0 font-mono text-[10px] text-[var(--tx-faint)]">{res.actual}</span>}
+              <button className="flex shrink-0 items-center text-[var(--tx-faint)] transition-colors hover:text-destructive" onClick={() => del(i)}>
+                <X size={10} />
               </button>
             </div>
           )
         })}
       </div>
-      <button className={styles.addAssert} onClick={add}>
-        <Icon name="plus" size={11} /> Add assertion
+      <button className="m-2 flex items-center gap-1 rounded-sm border border-dashed border-[var(--bd-subtle)] px-2.5 py-1 text-[11px] text-[var(--tx-faint)] transition-colors hover:border-primary hover:text-primary" onClick={add}>
+        <Plus size={11} /> Add assertion
       </button>
     </div>
   )

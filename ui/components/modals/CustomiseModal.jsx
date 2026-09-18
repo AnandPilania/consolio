@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
+import { cn } from '@/lib/utils'
 import { Icon, Btn } from '../shared'
+import { GripVertical, Eye, EyeOff } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -17,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import styles from './CustomiseModal.module.css'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
 const PANEL_INFO = {
   sidebar:      { label: 'Sidebar',        icon: 'layout',  desc: 'Collections, history & interceptor' },
@@ -32,7 +34,6 @@ export function CustomiseModal() {
   const updatePanelSize = useStore(s => s.updatePanelSize)
   const close = () => useStore.setState({ showCustomise: false })
 
-  // Build ordered list from panel order values
   const ordered = Object.entries(panels)
     .sort(([, a], [, b]) => a.order - b.order)
     .map(([key]) => key)
@@ -50,25 +51,23 @@ export function CustomiseModal() {
     const newIdx = items.indexOf(over.id)
     const next = arrayMove(items, oldIdx, newIdx)
     setItems(next)
-    // Persist order into store
     const newPanels = { ...panels }
     next.forEach((key, i) => { newPanels[key] = { ...newPanels[key], order: i } })
     useStore.setState({ panels: newPanels })
   }
 
   return (
-    <div className={styles.overlay} onClick={close}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.header}>
-          <Icon name="layout" size={15} style={{ color: 'var(--accent)' }} />
-          <span className={styles.title}>Customise Layout</span>
-          <button className={styles.closeBtn} onClick={close}>
-            <Icon name="x" size={14} />
-          </button>
-        </div>
+    <Dialog open onOpenChange={o => !o && close()}>
+      <DialogContent size="default" className="gap-0">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <Icon name="layout" size={15} className="text-primary" />
+            <DialogTitle>Customise Layout</DialogTitle>
+          </div>
+        </DialogHeader>
 
-        <div className={styles.body}>
-          <p className={styles.hint}>Drag panels to reorder • toggle visibility • resize in-app by dragging the dividers</p>
+        <div className="flex flex-col gap-2.5 overflow-y-auto p-4">
+          <p className="m-0 text-[11.5px] text-[var(--tx-faint)]">Drag panels to reorder • toggle visibility • resize in-app by dragging the dividers</p>
 
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={items} strategy={verticalListSortingStrategy}>
@@ -85,11 +84,11 @@ export function CustomiseModal() {
             </SortableContext>
           </DndContext>
 
-          <div className={styles.divider} />
+          <div className="my-1.5 h-px bg-[var(--bd-faint)]" />
 
-          <div className={styles.presets}>
-            <p className={styles.presetsLabel}>Quick presets</p>
-            <div className={styles.presetRow}>
+          <div className="flex flex-col gap-2">
+            <p className="m-0 text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Quick presets</p>
+            <div className="flex flex-wrap gap-1.5">
               {[
                 { label: 'Default',        action: resetPanels },
                 { label: 'Focus: Request', action: () => { useStore.setState(s => ({ panels: { ...s.panels, responsePane: { ...s.panels.responsePane, size: 20 }, requestPane: { ...s.panels.requestPane, size: 80 } } })) } },
@@ -102,67 +101,53 @@ export function CustomiseModal() {
           </div>
         </div>
 
-        <div className={styles.footer}>
+        <DialogFooter>
           <Btn variant="ghost" onClick={resetPanels}>Reset to defaults</Btn>
           <Btn variant="primary" onClick={close}>Done</Btn>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function SortablePanel({ id, info, panel, onToggle, onSizeChange }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  const isSplit = id === 'requestPane' || id === 'responsePane'
 
   return (
-    <div ref={setNodeRef} style={style} className={`${styles.panelRow} ${!panel.visible ? styles.panelHidden : ''}`}>
-      <button className={styles.dragHandle} {...attributes} {...listeners}>
-        <Icon name="drag" size={14} />
+    <div ref={setNodeRef} style={style} className={cn('flex items-center gap-2.5 rounded-md border border-[var(--bd-subtle)] bg-[var(--bg-raised)] p-2.5', !panel.visible && 'opacity-50')}>
+      <button className="flex shrink-0 cursor-grab items-center text-[var(--tx-faint)] active:cursor-grabbing" {...attributes} {...listeners}>
+        <GripVertical size={14} />
       </button>
 
-      <div className={styles.panelIcon}>
-        <Icon name={info.icon} size={14} style={{ color: 'var(--accent)' }} />
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-[var(--accent-dim)]">
+        <Icon name={info.icon} size={14} className="text-primary" />
       </div>
 
-      <div className={styles.panelInfo}>
-        <span className={styles.panelName}>{info.label}</span>
-        <span className={styles.panelDesc}>{info.desc}</span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[12px] font-semibold text-foreground">{info.label}</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--tx-faint)]">{info.desc}</span>
       </div>
 
-      <div className={styles.panelControls}>
-        {id !== 'requestPane' && id !== 'responsePane' && (
-          <div className={styles.sizeControl}>
-            <span className={styles.sizeLabel}>Width</span>
-            <input
-              type="range"
-              className={styles.sizeSlider}
-              min={panel.minSize} max={panel.maxSize}
-              value={panel.size}
-              onChange={e => onSizeChange(e.target.value)}
-            />
-            <span className={styles.sizeVal}>{panel.size}px</span>
-          </div>
-        )}
-        {(id === 'requestPane' || id === 'responsePane') && (
-          <div className={styles.sizeControl}>
-            <span className={styles.sizeLabel}>Split %</span>
-            <input
-              type="range"
-              className={styles.sizeSlider}
-              min={panel.minSize} max={panel.maxSize}
-              value={panel.size}
-              onChange={e => onSizeChange(e.target.value)}
-            />
-            <span className={styles.sizeVal}>{panel.size}%</span>
-          </div>
-        )}
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-[var(--tx-faint)]">{isSplit ? 'Split %' : 'Width'}</span>
+          <input
+            type="range"
+            className="w-[90px] accent-[var(--accent)]"
+            min={panel.minSize} max={panel.maxSize}
+            value={panel.size}
+            onChange={e => onSizeChange(e.target.value)}
+          />
+          <span className="w-9 shrink-0 text-right font-mono text-[10px] text-[var(--tx-faint)]">{panel.size}{isSplit ? '%' : 'px'}</span>
+        </div>
         <button
-          className={`${styles.toggleBtn} ${panel.visible ? styles.toggleOn : styles.toggleOff}`}
+          className={cn('flex size-6 items-center justify-center rounded-sm transition-colors', panel.visible ? 'text-primary' : 'text-[var(--tx-faint)]')}
           onClick={onToggle}
           title={panel.visible ? 'Hide panel' : 'Show panel'}
         >
-          <Icon name={panel.visible ? 'eye' : 'eyeOff'} size={13} />
+          {panel.visible ? <Eye size={13} /> : <EyeOff size={13} />}
         </button>
       </div>
     </div>

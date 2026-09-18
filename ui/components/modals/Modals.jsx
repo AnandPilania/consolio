@@ -1,22 +1,49 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore, apiFetch } from '../../store'
+import { cn } from '@/lib/utils'
+import { Plus, X, Sparkles, Play, Ban, Eye, EyeOff, Pencil, Trash2, Info } from 'lucide-react'
 import { Icon, IconBtn, Btn, FormGroup, Input, Select, Spinner, MethodBadge, KVTable } from '../shared'
 import { parseCurl, importPostmanCollection, importInsomniaExport, importOpenAPI, exportPostmanCollection, exportInsomniaCollection, exportOpenAPI, uid, fmtTime, timeAgo, buildHarRequest, GENERATE_TARGETS, downloadJson, downloadText, buildJUnitXml } from '../../utils'
-import styles from './Modals.module.css'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 
 /* ── Modal shell ──────────────────────────────────────────────────────────── */
 function Modal({ title, icon, onClose, children, footer, wide }) {
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={`${styles.modal} ${wide ? styles.wide : ''}`} onClick={e => e.stopPropagation()}>
-        <div className={styles.header}>
-          {icon && <Icon name={icon} size={15} style={{ color: 'var(--accent)' }} />}
-          <span className={styles.title}>{title}</span>
-          <button className={styles.closeBtn} onClick={onClose}><Icon name="x" size={14} /></button>
-        </div>
-        <div className={styles.body}>{children}</div>
-        {footer && <div className={styles.footer}>{footer}</div>}
-      </div>
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent size={wide ? 'lg' : 'default'} className="gap-0">
+        <DialogHeader>
+          <div className="flex items-center gap-2.5">
+            {icon && <Icon name={icon} size={15} className="text-primary" />}
+            <DialogTitle>{title}</DialogTitle>
+          </div>
+        </DialogHeader>
+        <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-5">{children}</div>
+        {footer && <DialogFooter>{footer}</DialogFooter>}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* Pill-style tab strip, shared by Import / CodeGen ────────────────────────── */
+function PillTabs({ items, activeKey, onChange, getKey = x => x, getLabel = x => x }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {items.map(item => {
+        const key = getKey(item)
+        return (
+          <button
+            key={key}
+            className={cn(
+              'rounded-sm border border-[var(--bd-subtle)] px-3.5 py-1 text-[11px] font-semibold text-[var(--tx-faint)] transition-colors hover:text-muted-foreground',
+              key === activeKey && 'border-transparent bg-[var(--accent-dim)] text-primary!'
+            )}
+            onClick={() => onChange(key)}
+          >
+            {getLabel(item)}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -55,9 +82,6 @@ export function NewCollectionModal() {
   )
 }
 
-/* ── Import ───────────────────────────────────────────────────────────────── */
-// Creates the collection, then its folders (sequentially, so client-temp folder
-// ids can be remapped to server-assigned ids), then bulk-creates the requests.
 async function createCollectionFromImport(imported, description) {
   const col = await apiFetch('/api/collections', { method: 'POST', body: { name: imported.name, description } })
   const idMap = {}
@@ -184,17 +208,11 @@ export function ImportModal() {
 
   return (
     <Modal title="Import" icon="upload" onClose={close} footer={footer}>
-      <div className={styles.importTabs}>
-        {IMPORT_TABS.map(([key, label]) => (
-          <button key={key} className={`${styles.importTab} ${tab === key ? styles.importTabActive : ''}`} onClick={() => setTab(key)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className={styles.importHint}>{hints[tab]}</p>
+      <PillTabs items={IMPORT_TABS} activeKey={tab} onChange={setTab} getKey={([k]) => k} getLabel={([, l]) => l} />
+      <p className="m-0 text-[11.5px] text-[var(--tx-faint)]">{hints[tab]}</p>
 
       {tab === 'scan' ? (
-        <div className={styles.scanForm}>
+        <div className="flex flex-col gap-2.5">
           <FormGroup label="Subdirectory (optional — defaults to the whole project)">
             <Input value={scanPath} onChange={e => setScanPath(e.target.value)} placeholder="src/routes" />
           </FormGroup>
@@ -202,26 +220,26 @@ export function ImportModal() {
             <Input value={scanBaseUrl} onChange={e => setScanBaseUrl(e.target.value)} placeholder="http://localhost:3000" />
           </FormGroup>
           {scanResult && (
-            <div className={styles.scanResults}>
-              <p className={styles.scanResultsHeader}>{scanResult.description}</p>
+            <div className="mt-1.5 max-h-64 overflow-y-auto rounded-md border border-[var(--bd-subtle)]">
+              <p className="m-0 border-b border-[var(--bd-faint)] px-3 py-2 text-[11px] text-[var(--tx-faint)]">{scanResult.description}</p>
               {scanResult.requests.map(r => (
-                <div key={r.id} className={styles.scanResultRow}>
+                <div key={r.id} className="flex items-center gap-2 border-b border-[var(--bd-faint)] px-3 py-1.5 last:border-b-0">
                   <MethodBadge method={r.method} small />
-                  <span className={styles.scanResultUrl}>{r.url}</span>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11.5px] text-foreground">{r.url}</span>
                 </div>
               ))}
             </div>
           )}
         </div>
       ) : (
-        <textarea
-          className={styles.importArea}
+        <Textarea
+          className="min-h-[130px] resize-y text-[11.5px] leading-[1.55]"
           placeholder={placeholders[tab]}
           value={text}
           onChange={e => setText(e.target.value)}
         />
       )}
-      {error && <div className={styles.importError}>{error}</div>}
+      {error && <div className="rounded-sm border border-destructive/25 bg-[var(--err-dim)] px-3 py-2 text-[12px] text-destructive">{error}</div>}
     </Modal>
   )
 }
@@ -269,20 +287,10 @@ export function CodeGenModal() {
       title="Generate Code" icon="code" onClose={close} wide
       footer={<><Btn variant="ghost" onClick={close}>Close</Btn><Btn variant="primary" onClick={copy}>Copy</Btn></>}
     >
-      <div className={styles.importTabs}>
-        {GENERATE_TARGETS.map((t, i) => (
-          <button
-            key={t.label}
-            className={`${styles.importTab} ${i === targetIdx ? styles.importTabActive : ''}`}
-            onClick={() => setTargetIdx(i)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <PillTabs items={GENERATE_TARGETS} activeKey={targetIdx} onChange={setTargetIdx} getKey={(t, i) => GENERATE_TARGETS.indexOf(t)} getLabel={t => t.label} />
       {error
-        ? <div className={styles.importError}>{error}</div>
-        : <textarea className={styles.importArea} style={{ minHeight: 280 }} readOnly value={code} />
+        ? <div className="rounded-sm border border-destructive/25 bg-[var(--err-dim)] px-3 py-2 text-[12px] text-destructive">{error}</div>
+        : <Textarea className="min-h-[280px] resize-y text-[11.5px] leading-[1.55]" readOnly value={code} />
       }
     </Modal>
   )
@@ -293,7 +301,6 @@ export function RunnerModal() {
   const collections = useStore(s => s.collections)
   const environments = useStore(s => s.environments)
   const activeEnvId  = useStore(s => s.activeEnvId)
-  const showNotif    = useStore(s => s.showNotif)
   const close = () => useStore.setState({ modal: null })
 
   const [colId,       setColId]       = useState(collections[0]?.id || '')
@@ -371,68 +378,76 @@ export function RunnerModal() {
     else downloadText(`${col.name}.results.junit.xml`, buildJUnitXml(col.name, items), 'application/xml')
   }
 
+  const RS_CLASS = {
+    pass: 'bg-[var(--ok-dim)] text-[var(--ok)]',
+    fail: 'bg-[var(--err-dim)] text-[var(--err)]',
+    pending: 'bg-[var(--bg-overlay)] text-[var(--tx-faint)]',
+    running: 'bg-[var(--accent-dim)] text-primary',
+    skipped: 'bg-[var(--bg-overlay)] text-[var(--tx-faint)]',
+  }
+
   return (
     <Modal title="Collection Runner" icon="play" onClose={close} wide footer={
       <Btn variant="ghost" onClick={close}>Close</Btn>
     }>
-      <div className={styles.runnerControls}>
-        <Select value={colId} onChange={e => setColId(e.target.value)} className={styles.runnerSelect}>
+      <div className="flex items-center gap-2">
+        <Select value={colId} onChange={e => setColId(e.target.value)} className="flex-1">
           {collections.map(c => (
             <option key={c.id} value={c.id}>{c.name} ({c.requests?.length || 0} requests)</option>
           ))}
         </Select>
-        <Select value={envId} onChange={e => setEnvId(e.target.value)} className={styles.runnerSelect} style={{ flex: 'unset', width: 140 }}>
+        <Select value={envId} onChange={e => setEnvId(e.target.value)} className="w-[140px] shrink-0">
           <option value="">No environment</option>
           {environments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </Select>
-        <div className={styles.delayControl}>
+        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-[var(--tx-faint)]">
           <span>Concurrency</span>
           <input
-            type="number" className={styles.delayInput}
+            type="number" className="w-[60px] rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-raised)] px-1.5 py-1 text-right text-[11.5px] text-foreground focus:border-primary focus:outline-none"
             min={1} max={20} value={concurrency}
             onChange={e => setConcurrency(parseInt(e.target.value) || 1)}
           />
         </div>
-        <div className={styles.delayControl}>
+        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-[var(--tx-faint)]">
           <span>Delay</span>
           <input
-            type="number" className={styles.delayInput}
+            type="number" className="w-[60px] rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-raised)] px-1.5 py-1 text-right text-[11.5px] text-foreground focus:border-primary focus:outline-none"
             min={0} max={5000} value={delay}
             onChange={e => setDelay(parseInt(e.target.value) || 0)}
           />
           <span>ms</span>
         </div>
-        <label className={styles.delayControl} style={{ cursor: 'pointer' }}>
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-[var(--tx-faint)]">
           <input type="checkbox" checked={bail} onChange={e => setBail(e.target.checked)} />
           <span>Bail on fail</span>
         </label>
         <Btn variant="primary" onClick={run} disabled={running}>
-          {running ? <><Spinner size={12} /> Running…</> : <><Icon name="play" size={13} /> Run All</>}
+          {running ? <><Spinner size={12} /> Running…</> : <><Play size={13} /> Run All</>}
         </Btn>
       </div>
 
       {results.length > 0 && (
-        <div className={styles.runnerSummary}>
-          <span className={styles.passCount}>● {passCount} passed</span>
-          <span className={styles.failCount}>{failCount} failed</span>
-          {skippedCount > 0 && <span className={styles.totalCount}>{skippedCount} skipped</span>}
-          <span className={styles.totalCount}>{col?.requests?.length || 0} total</span>
+        <div className="flex items-center gap-3.5 rounded-md border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-3 py-2 text-[12px]">
+          <span className="text-[var(--ok)]">● {passCount} passed</span>
+          <span className="text-destructive">{failCount} failed</span>
+          {skippedCount > 0 && <span className="text-[var(--tx-faint)]">{skippedCount} skipped</span>}
+          <span className="text-[var(--tx-faint)]">{col?.requests?.length || 0} total</span>
           {!running && (
             <>
-              <span style={{ flex: 1 }} />
-              <button className={styles.envAction} onClick={() => exportResults('json')} title="Export as JSON">JSON</button>
-              <button className={styles.envAction} onClick={() => exportResults('junit')} title="Export as JUnit XML">JUnit</button>
+              <span className="flex-1" />
+              <button className="text-[var(--tx-faint)] transition-colors hover:text-foreground" onClick={() => exportResults('json')} title="Export as JSON">JSON</button>
+              <button className="text-[var(--tx-faint)] transition-colors hover:text-foreground" onClick={() => exportResults('junit')} title="Export as JUnit XML">JUnit</button>
             </>
           )}
         </div>
       )}
 
-      <div className={styles.runnerResults}>
+      <div className="flex max-h-80 flex-col gap-1 overflow-y-auto">
         {results.length === 0
-          ? <p className={styles.runnerEmpty}>Select a collection and press Run All</p>
+          ? <p className="p-6 text-center text-[12px] text-[var(--tx-faint)]">Select a collection and press Run All</p>
           : results.map((r, i) => (
-            <div key={i} className={styles.runnerRow}>
-              <div className={`${styles.runnerStatus} ${styles[`rs_${r._status}`]}`}>
+            <div key={i} className="flex items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2.5 py-1.5">
+              <div className={cn('flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold', RS_CLASS[r._status])}>
                 {r._status === 'pass'     ? '✓'
                  : r._status === 'fail'   ? '✕'
                  : r._status === 'running'? <Spinner size={10} />
@@ -440,12 +455,12 @@ export function RunnerModal() {
                  : '·'}
               </div>
               <MethodBadge method={r.method || 'GET'} small />
-              <span className={styles.runnerName}>{r.name || r.url || `Request ${i + 1}`}</span>
+              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{r.name || r.url || `Request ${i + 1}`}</span>
               {r._testResults?.length > 0 && (
-                <span className={styles.runnerMeta}>{r._testResults.filter(t => t.pass).length}/{r._testResults.length} tests</span>
+                <span className="shrink-0 font-mono text-[11px] text-[var(--tx-faint)]">{r._testResults.filter(t => t.pass).length}/{r._testResults.length} tests</span>
               )}
               {r._resStatus !== undefined && r._resStatus !== null && (
-                <span className={styles.runnerMeta}>{r._resStatus} · {fmtTime(r._elapsed || 0)}</span>
+                <span className="shrink-0 font-mono text-[11px] text-[var(--tx-faint)]">{r._resStatus} · {fmtTime(r._elapsed || 0)}</span>
               )}
             </div>
           ))
@@ -514,9 +529,9 @@ export function SettingsModal() {
       <><Btn variant="ghost" onClick={close}>Cancel</Btn><Btn variant="primary" onClick={saveSettings}>Save Settings</Btn></>
     }>
       {/* ── Project ─────────────────────────────────────────────────────── */}
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Project</h3>
-        <div className={styles.settingsGrid}>
+      <section className="flex flex-col gap-3">
+        <h3 className="m-0 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">Project</h3>
+        <div className="grid grid-cols-2 gap-3">
           <FormGroup label="Project name">
             <Input value={form.name || ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </FormGroup>
@@ -554,7 +569,7 @@ export function SettingsModal() {
               <option value="true">On — full app rendering (SPAs, cookies)</option>
             </Select>
           </FormGroup>
-          <p className={styles.settingsHint}>
+          <p className="col-span-full -mt-1 text-[11px] leading-[1.5] text-[var(--tx-faint)]">
             When on, GET responses previewed as HTML navigate the browser directly to
             the request URL — needed for apps with their own scripts, cookies, and
             cross-origin assets to render correctly. That preview frame can then read
@@ -565,9 +580,9 @@ export function SettingsModal() {
       </section>
 
       {/* ── AI Assist ───────────────────────────────────────────────────── */}
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>AI Assist</h3>
-        <div className={styles.settingsGrid}>
+      <section className="flex flex-col gap-3">
+        <h3 className="m-0 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">AI Assist</h3>
+        <div className="grid grid-cols-2 gap-3">
           <FormGroup label="Provider">
             <Select value={aiConfig.provider} onChange={e => setAiConfig({ provider: e.target.value })}>
               <option value="anthropic">Anthropic</option>
@@ -625,7 +640,7 @@ export function SettingsModal() {
             />
           </FormGroup>
         </div>
-        <p className={styles.settingsHint}>
+        <p className="-mt-1 text-[11px] leading-[1.5] text-[var(--tx-faint)]">
           Powers the "Fix with AI" button on a request's Info tab, which suggests a
           description and test assertions. Bring-your-own-endpoint — works with Anthropic,
           OpenAI, Azure OpenAI, a local or remote Ollama instance, or any other
@@ -636,9 +651,9 @@ export function SettingsModal() {
       </section>
 
       {/* ── Environments ────────────────────────────────────────────────── */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Environments</h3>
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center">
+          <h3 className="m-0 flex-1 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">Environments</h3>
           <Btn variant="ghost" size="sm" onClick={() => {
             setEnvEdit('__new__')
             setEnvForm({ name: '', color: '#f59e0b', variables: [{ id: uid(), key: '', value: '', enabled: true, secret: false }] })
@@ -647,69 +662,71 @@ export function SettingsModal() {
           </Btn>
         </div>
 
-        <div className={styles.envList}>
+        <div className="flex flex-col gap-1.5">
           {environments.map(env => (
-            <div key={env.id} className={styles.envRow}>
-              <span className={styles.envDot} style={{ background: env.color || '#6366f1' }} />
-              <span className={styles.envName}>{env.name}</span>
-              {activeEnvId === env.id && <span className={styles.activeTag}>active</span>}
-              <button className={styles.envAction} title="Set active" onClick={() => useStore.setState({ activeEnvId: env.id })}>✓</button>
-              <button className={styles.envAction} title="Edit"       onClick={() => startEditEnv(env)}><Icon name="settings" size={12} /></button>
-              <button className={`${styles.envAction} ${styles.envDel}`} title="Delete" onClick={() => deleteEnv(env.id)}><Icon name="trash" size={12} /></button>
+            <div key={env.id} className="flex items-center gap-1.5 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2.5 py-1.5">
+              <span className="size-2 shrink-0 rounded-full" style={{ background: env.color || '#6366f1' }} />
+              <span className="flex-1 text-[12px] text-foreground">{env.name}</span>
+              {activeEnvId === env.id && <span className="rounded-full bg-[var(--ok-dim)] px-1.5 py-px text-[10px] text-[var(--ok)]">active</span>}
+              <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-foreground" title="Set active" onClick={() => useStore.setState({ activeEnvId: env.id })}>✓</button>
+              <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-foreground" title="Edit" onClick={() => startEditEnv(env)}><Icon name="settings" size={12} /></button>
+              <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-destructive!" title="Delete" onClick={() => deleteEnv(env.id)}><Icon name="trash" size={12} /></button>
             </div>
           ))}
-          {environments.length === 0 && <p className={styles.noEnvs}>No environments yet</p>}
+          {environments.length === 0 && <p className="text-[12px] text-[var(--tx-faint)]">No environments yet</p>}
         </div>
 
         {/* Inline editor */}
         {envEdit && (
-          <div className={styles.envEditor}>
-            <div className={styles.envEditorTitle}>
+          <div className="flex flex-col gap-2.5 rounded-md border border-[var(--bd-base)] bg-[var(--bg-raised)] p-3.5">
+            <div className="text-[11px] font-bold tracking-wide text-primary uppercase">
               {envEdit === '__new__' ? 'New Environment' : 'Edit Environment'}
             </div>
-            <div className={styles.envEditorRow}>
+            <div className="flex items-center gap-2">
               <Input
                 value={envForm.name || ''}
                 onChange={e => setEnvForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Environment name"
-                className={styles.envNameInput}
+                className="flex-1"
               />
               <input
                 type="color"
                 value={envForm.color || '#f59e0b'}
-                className={styles.colorPicker}
+                className="size-9 shrink-0 cursor-pointer rounded-sm border border-[var(--bd-subtle)] bg-[var(--bg-overlay)] p-0.5"
                 onChange={e => setEnvForm(f => ({ ...f, color: e.target.value }))}
               />
             </div>
 
-            <div className={styles.envVarLabel}>Variables</div>
+            <div className="text-[10.5px] font-semibold tracking-wide text-[var(--tx-faint)] uppercase">Variables</div>
             {(envForm.variables || []).map((v, i) => (
-              <div key={v.id || i} className={styles.envVarRow}>
+              <div key={v.id || i} className="flex items-center gap-1">
                 <input
-                  type="checkbox" className={styles.envCheck}
+                  type="checkbox" className="size-3.5 shrink-0 accent-[var(--accent)]"
                   checked={v.enabled}
                   onChange={e => updEnvVar(i, 'enabled', e.target.checked)}
                 />
                 <input
-                  className={styles.envVarInput} placeholder="KEY"
+                  className="flex-1 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-overlay)] px-1.5 py-1 font-mono text-[11px] text-foreground placeholder:text-[var(--tx-faint)] focus:border-primary focus:outline-none"
+                  placeholder="KEY"
                   value={v.key || ''}
                   onChange={e => updEnvVar(i, 'key', e.target.value)}
                 />
                 <input
-                  className={styles.envVarInput} placeholder="Value"
+                  className="flex-1 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-overlay)] px-1.5 py-1 font-mono text-[11px] text-foreground placeholder:text-[var(--tx-faint)] focus:border-primary focus:outline-none"
+                  placeholder="Value"
                   type={v.secret ? 'password' : 'text'}
                   value={v.value || ''}
                   onChange={e => updEnvVar(i, 'value', e.target.value)}
                 />
                 <button
-                  className={styles.envSecretBtn}
+                  className="flex p-0.5 text-[var(--tx-faint)] transition-colors hover:text-muted-foreground"
                   title={v.secret ? 'Show value' : 'Hide value'}
                   onClick={() => updEnvVar(i, 'secret', !v.secret)}
                 >
                   <Icon name={v.secret ? 'eyeOff' : 'eye'} size={11} />
                 </button>
                 <button
-                  className={styles.envVarDel}
+                  className="flex p-0.5 text-[var(--tx-faint)] transition-colors hover:text-destructive"
                   onClick={() => setEnvForm(f => ({ ...f, variables: f.variables.filter((_, j) => j !== i) }))}
                 >
                   <Icon name="x" size={10} />
@@ -717,14 +734,14 @@ export function SettingsModal() {
               </div>
             ))}
 
-            <div className={styles.envEditorActions}>
+            <div className="flex items-center gap-2">
               <Btn variant="ghost" size="sm" onClick={() => setEnvForm(f => ({
                 ...f,
                 variables: [...(f.variables || []), { id: uid(), key: '', value: '', enabled: true, secret: false }],
               }))}>
                 <Icon name="plus" size={11} /> Add Variable
               </Btn>
-              <div style={{ flex: 1 }} />
+              <div className="flex-1" />
               <Btn variant="ghost"   size="sm" onClick={() => setEnvEdit(null)}>Cancel</Btn>
               <Btn variant="primary" size="sm" onClick={saveEnv}>Save</Btn>
             </div>
@@ -733,13 +750,13 @@ export function SettingsModal() {
       </section>
 
       {/* ── Browser interceptor hint ─────────────────────────────────────── */}
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Browser Interceptor</h3>
-        <div className={styles.interceptorHint}>
-          <p>1. Open <code>chrome://extensions/</code> → enable <strong>Developer Mode</strong></p>
-          <p>2. Click <strong>Load unpacked</strong> → select the <code>extension/</code> folder</p>
-          <p>3. Click the consolio icon in your Chrome toolbar</p>
-          <p>4. Toggle <strong>Capture requests</strong> ON — requests appear in the <strong>Tap</strong> sidebar</p>
+      <section className="flex flex-col gap-3">
+        <h3 className="m-0 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">Browser Interceptor</h3>
+        <div className="flex flex-col gap-1.5 rounded-md border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-3.5 py-3 text-[12px] leading-[1.7] text-muted-foreground [&_code]:rounded-[3px] [&_code]:bg-[var(--bg-overlay)] [&_code]:px-1.5 [&_code]:py-px [&_code]:text-primary">
+          <p className="m-0">1. Open <code>chrome://extensions/</code> → enable <strong>Developer Mode</strong></p>
+          <p className="m-0">2. Click <strong>Load unpacked</strong> → select the <code>extension/</code> folder</p>
+          <p className="m-0">3. Click the consolio icon in your Chrome toolbar</p>
+          <p className="m-0">4. Toggle <strong>Capture requests</strong> ON — requests appear in the <strong>Tap</strong> sidebar</p>
         </div>
       </section>
     </Modal>
@@ -749,14 +766,19 @@ export function SettingsModal() {
 /* ── Plugin manager ───────────────────────────────────────────────────────── */
 export function PluginManagerModal() {
   const showNotif = useStore(s => s.showNotif)
+  const loadPluginTabs = useStore(s => s.loadPluginTabs)
+  const modalData = useStore(s => s.modalData)
   const close = () => useStore.setState({ modal: null })
 
   const [plugins, setPlugins] = useState([])
   const [bundled, setBundled] = useState([])
   const [loading, setLoading] = useState(true)
   const [installing, setInstalling] = useState(false)
-  const [installingDir, setInstallingDir] = useState(null)
+  const [installingDirs, setInstallingDirs] = useState(() => new Set())
   const [pkgName, setPkgName] = useState('')
+  const [infoPlugin, setInfoPlugin] = useState(null)
+  const [focusedPlugin, setFocusedPlugin] = useState(null)
+  const pluginNodes = useRef({})
 
   const loadPlugins = async () => {
     setLoading(true)
@@ -766,8 +788,17 @@ export function PluginManagerModal() {
       setBundled(avail)
     } catch { }
     setLoading(false)
+    await loadPluginTabs()
   }
   useEffect(() => { loadPlugins() }, [])
+  useEffect(() => {
+    const name = modalData?.pluginName
+    if (!name || !pluginNodes.current[name]) return
+    pluginNodes.current[name].scrollIntoView({ block: 'center', behavior: 'smooth' })
+    setFocusedPlugin(name)
+    const timer = setTimeout(() => setFocusedPlugin(null), 1800)
+    return () => clearTimeout(timer)
+  }, [modalData?.pluginName, plugins, bundled])
 
   const install = async () => {
     if (!pkgName.trim()) { showNotif('Enter a package name', 'error'); return }
@@ -783,14 +814,20 @@ export function PluginManagerModal() {
   }
 
   const installBundled = async (dir) => {
-    setInstallingDir(dir)
+    setInstallingDirs(current => new Set(current).add(dir))
     try {
       const res = await apiFetch('/api/plugins/bundled', { method: 'POST', body: { dir } })
       if (res.error) throw new Error(res.error)
       showNotif(`Installed ${res.name}`, 'success')
       await loadPlugins()
     } catch (e) { showNotif(e.message, 'error') }
-    setInstallingDir(null)
+    finally {
+      setInstallingDirs(current => {
+        const next = new Set(current)
+        next.delete(dir)
+        return next
+      })
+    }
   }
 
   const uninstall = async (name) => {
@@ -806,14 +843,19 @@ export function PluginManagerModal() {
   const installedNames = new Set(plugins.map(p => p.name))
   const bundledNames = new Set(bundled.map(b => b.name))
   const notYetInstalled = bundled.filter(b => !installedNames.has(b.name))
+  const setPluginNode = name => node => {
+    if (node) pluginNodes.current[name] = node
+    else delete pluginNodes.current[name]
+  }
 
   return (
-    <Modal title="Plugins" icon="code" onClose={close} footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
-      <p className={styles.importHint}>
-        Installs an npm package into <code>.consolio/plugins/</code>. A plugin exports
-        <code> requestHooks</code>, <code>responseHooks</code>, and/or <code>templateTags</code> — see the README.
+    <>
+      <Modal title="Plugins" icon="code" onClose={close} footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
+      <p className="m-0 text-[11.5px] text-[var(--tx-faint)]">
+        Installs an npm package into <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">.consolio/plugins/</code>. A plugin exports
+        <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary"> requestHooks</code>, <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">responseHooks</code>, <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">templateTags</code>, and/or <code className="rounded-[3px] bg-[var(--bg-overlay)] px-1.5 py-px text-primary">paneTabs</code> — see the README.
       </p>
-      <div className={styles.mockNewForm} style={{ flexDirection: 'row' }}>
+      <div className="flex flex-row gap-1.5 rounded-sm border border-dashed border-[var(--bd-subtle)] p-2">
         <Input value={pkgName} onChange={e => setPkgName(e.target.value)} placeholder="npm package name" />
         <Btn variant="primary" size="sm" onClick={install} disabled={installing}>
           {installing ? <Spinner size={12} /> : 'Install'}
@@ -822,16 +864,17 @@ export function PluginManagerModal() {
 
       {!loading && notYetInstalled.length > 0 && (
         <>
-          <p className={styles.settingsHint} style={{ marginTop: 14 }}>Bundled with consolio — install with one click:</p>
-          <div className={styles.mockList} style={{ width: 'auto' }}>
+          <p className="mt-3.5 text-[11px] leading-[1.5] text-[var(--tx-faint)]">Bundled with consolio — install with one click:</p>
+          <div className="flex flex-col gap-1">
             {notYetInstalled.map(b => (
-              <div key={b.dir} className={styles.mockRow} style={{ cursor: 'default' }}>
-                <div className={styles.mockInfo}>
-                  <span className={styles.mockName}>{b.name}</span>
-                  <span className={styles.mockMeta}>{b.description}</span>
+              <div key={b.dir} ref={setPluginNode(b.name)} className={cn('flex cursor-default items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5 transition-colors', focusedPlugin === b.name && 'border-primary bg-[var(--accent-dim)]')}>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{b.name}</span>
+                  <span className="font-mono text-[10px] text-[var(--tx-faint)]">{b.description}</span>
                 </div>
-                <Btn variant="ghost" size="sm" onClick={() => installBundled(b.dir)} disabled={installingDir === b.dir}>
-                  {installingDir === b.dir ? <Spinner size={12} /> : 'Install'}
+                <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-foreground" onClick={() => setInfoPlugin(b)} title="Plugin information"><Info size={13} /></button>
+                <Btn variant="ghost" size="sm" onClick={() => installBundled(b.dir)} disabled={installingDirs.has(b.dir)}>
+                  {installingDirs.has(b.dir) ? <Spinner size={12} /> : 'Install'}
                 </Btn>
               </div>
             ))}
@@ -839,29 +882,65 @@ export function PluginManagerModal() {
         </>
       )}
 
-      <div className={styles.mockList} style={{ width: 'auto', marginTop: 12 }}>
+      <div className="mt-3 flex flex-col gap-1">
         {loading && <Spinner size={16} />}
-        {!loading && plugins.length === 0 && <p className={styles.runnerEmpty}>No plugins installed</p>}
+        {!loading && plugins.length === 0 && <p className="p-6 text-center text-[12px] text-[var(--tx-faint)]">No plugins installed</p>}
         {plugins.map(p => (
-          <div key={p.name} className={styles.mockRow} style={{ cursor: 'default' }}>
-            <span className={`${styles.mockDot} ${p.enabled ? styles.mockRunning : styles.mockStopped}`} />
-            <div className={styles.mockInfo}>
-              <span className={styles.mockName}>
+          <div key={p.name} ref={setPluginNode(p.name)} className={cn('flex cursor-default items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5 transition-colors', focusedPlugin === p.name && 'border-primary bg-[var(--accent-dim)]')}>
+            <span className={cn('size-1.5 shrink-0 rounded-full', p.enabled ? 'bg-[var(--ok)] shadow-[0_0_0_3px_var(--ok-dim)]' : 'bg-[var(--tx-faint)]')} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">
                 {p.name}{' '}
-                {bundledNames.has(p.name) && <span className={styles.activeTag}>Core</span>}
+                {bundledNames.has(p.name) && <span className="rounded-full bg-[var(--ok-dim)] px-1.5 py-px text-[10px] text-[var(--ok)]">Core</span>}
               </span>
-              <span className={styles.mockMeta}>v{p.version}</span>
+              <span className="font-mono text-[10px] text-[var(--tx-faint)]">v{p.version}</span>
             </div>
-            <button className={styles.envAction} onClick={() => toggleEnabled(p)} title={p.enabled ? 'Disable' : 'Enable'}>
+            <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-foreground" onClick={() => setInfoPlugin(p)} title="Plugin information">
+              <Info size={13} />
+            </button>
+            <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-foreground" onClick={() => toggleEnabled(p)} title={p.enabled ? 'Disable' : 'Enable'}>
               <Icon name={p.enabled ? 'eyeOff' : 'eye'} size={13} />
             </button>
-            <button className={`${styles.envAction} ${styles.envDel}`} onClick={() => uninstall(p.name)} title="Uninstall">
+            <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-destructive!" onClick={() => uninstall(p.name)} title="Uninstall">
               <Icon name="trash" size={13} />
             </button>
           </div>
         ))}
       </div>
-    </Modal>
+      </Modal>
+      {infoPlugin && <PluginInfoModal plugin={infoPlugin} onClose={() => setInfoPlugin(null)} />}
+    </>
+  )
+}
+
+function PluginInfoModal({ plugin, onClose }) {
+  return (
+    <Dialog open onOpenChange={open => !open && onClose()}>
+      <DialogContent size="default" className="gap-0">
+        <DialogHeader>
+          <div className="flex items-center gap-2.5">
+            <Info size={15} className="text-primary" />
+            <DialogTitle>{plugin.name}</DialogTitle>
+          </div>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 p-5">
+          <div className="grid grid-cols-3 gap-2 text-[11.5px]">
+            <div><div className="text-[var(--tx-faint)]">Author</div><div className="mt-0.5 text-foreground">{plugin.author || 'Not specified'}</div></div>
+            <div><div className="text-[var(--tx-faint)]">Version</div><div className="mt-0.5 font-mono text-foreground">{plugin.version || 'Not specified'}</div></div>
+            <div><div className="text-[var(--tx-faint)]">Release</div><div className="mt-0.5 text-foreground">{plugin.release || 'Not specified'}</div></div>
+          </div>
+          <section>
+            <h3 className="m-0 text-[11px] font-bold uppercase tracking-wide text-[var(--tx-faint)]">Description</h3>
+            <p className="mt-1.5 mb-0 text-[12px] leading-relaxed text-foreground">{plugin.description || 'No description provided.'}</p>
+          </section>
+          <section className="border-l-2 border-primary pl-3">
+            <h3 className="m-0 text-[11px] font-bold uppercase tracking-wide text-[var(--tx-faint)]">Developer use-case</h3>
+            <p className="mt-1.5 mb-0 text-[12px] leading-relaxed text-foreground">{plugin.useCase || 'Use this plugin to extend consolio for a recurring API development workflow.'}</p>
+          </section>
+          {plugin.homepage && <a className="text-[12px] text-primary underline underline-offset-2" href={plugin.homepage} target="_blank" rel="noreferrer">Plugin homepage</a>}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -925,37 +1004,37 @@ export function MockManagerModal() {
 
   return (
     <Modal title="Mock Servers" icon="globe" onClose={close} wide footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
-      <div className={styles.mockLayout}>
-        <div className={styles.mockList}>
+      <div className="flex min-h-[360px] gap-3.5">
+        <div className="flex w-[220px] shrink-0 flex-col gap-1">
           {loading && <Spinner size={16} />}
           {!loading && mocks.length === 0 && !creating && (
-            <p className={styles.runnerEmpty}>No mock sets yet</p>
+            <p className="p-6 text-center text-[12px] text-[var(--tx-faint)]">No mock sets yet</p>
           )}
           {mocks.map(m => (
             <div
               key={m.id}
-              className={`${styles.mockRow} ${m.id === selectedId ? styles.mockRowActive : ''}`}
+              className={cn('flex cursor-pointer items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5', m.id === selectedId && 'border-primary')}
               onClick={() => setSelectedId(m.id)}
             >
-              <span className={`${styles.mockDot} ${m.running ? styles.mockRunning : styles.mockStopped}`} />
-              <div className={styles.mockInfo}>
-                <span className={styles.mockName}>{m.name}</span>
-                <span className={styles.mockMeta}>:{m.port} · {m.routes?.length || 0} routes</span>
+              <span className={cn('size-1.5 shrink-0 rounded-full', m.running ? 'bg-[var(--ok)] shadow-[0_0_0_3px_var(--ok-dim)]' : 'bg-[var(--tx-faint)]')} />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{m.name}</span>
+                <span className="font-mono text-[10px] text-[var(--tx-faint)]">:{m.port} · {m.routes?.length || 0} routes</span>
               </div>
-              <button className={styles.envAction} onClick={e => toggleRunning(m, e)} title={m.running ? 'Stop' : 'Start'}>
+              <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-foreground" onClick={e => toggleRunning(m, e)} title={m.running ? 'Stop' : 'Start'}>
                 <Icon name={m.running ? 'ban' : 'play'} size={13} />
               </button>
-              <button className={`${styles.envAction} ${styles.envDel}`} onClick={e => deleteMock(m.id, e)} title="Delete">
+              <button className="flex items-center p-0.5 text-[var(--tx-faint)] transition-colors hover:text-destructive!" onClick={e => deleteMock(m.id, e)} title="Delete">
                 <Icon name="trash" size={13} />
               </button>
             </div>
           ))}
 
           {creating ? (
-            <div className={styles.mockNewForm}>
+            <div className="flex flex-col gap-1.5 rounded-sm border border-dashed border-[var(--bd-subtle)] p-2">
               <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Mock set name" />
               <Input value={newPort} onChange={e => setNewPort(e.target.value)} placeholder="Port" />
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="flex gap-1.5">
                 <Btn variant="ghost" size="sm" onClick={() => setCreating(false)}>Cancel</Btn>
                 <Btn variant="primary" size="sm" onClick={createMock}>Create</Btn>
               </div>
@@ -967,34 +1046,34 @@ export function MockManagerModal() {
           )}
         </div>
 
-        <div className={styles.mockRoutes}>
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto">
           {!selected ? (
-            <p className={styles.runnerEmpty}>Select a mock set to edit its routes</p>
+            <p className="p-6 text-center text-[12px] text-[var(--tx-faint)]">Select a mock set to edit its routes</p>
           ) : (
             <>
               {routes.map((route, i) => (
-                <div key={route.id} className={styles.mockRouteCard}>
-                  <div className={styles.mockRouteHeader}>
-                    <Select value={route.method} onChange={e => updateRoute(i, { method: e.target.value })} style={{ width: 90 }}>
+                <div key={route.id} className="flex flex-col gap-1.5 rounded-md border border-[var(--bd-faint)] bg-[var(--bg-raised)] p-2">
+                  <div className="flex items-center gap-1.5">
+                    <Select value={route.method} onChange={e => updateRoute(i, { method: e.target.value })} className="w-[90px] shrink-0">
                       {['GET','POST','PUT','PATCH','DELETE'].map(m => <option key={m} value={m}>{m}</option>)}
                     </Select>
-                    <Input value={route.path} onChange={e => updateRoute(i, { path: e.target.value })} placeholder="/users/:id" className={styles.mockPathInput} />
-                    <Input value={route.statusCode} onChange={e => updateRoute(i, { statusCode: parseInt(e.target.value) || 200 })} placeholder="200" className={styles.mockStatusInput} />
-                    <Input value={route.delayMs} onChange={e => updateRoute(i, { delayMs: parseInt(e.target.value) || 0 })} placeholder="delay ms" className={styles.mockStatusInput} />
+                    <Input value={route.path} onChange={e => updateRoute(i, { path: e.target.value })} placeholder="/users/:id" className="flex-1" />
+                    <Input value={route.statusCode} onChange={e => updateRoute(i, { statusCode: parseInt(e.target.value) || 200 })} placeholder="200" className="w-[70px] shrink-0" />
+                    <Input value={route.delayMs} onChange={e => updateRoute(i, { delayMs: parseInt(e.target.value) || 0 })} placeholder="delay ms" className="w-[70px] shrink-0" />
                     <IconBtn name="trash" size={13} title="Delete route" onClick={() => deleteRoute(i)} />
                   </div>
                   <KVTable rows={route.headers || []} onChange={v => updateRoute(i, { headers: v })} placeholder={['Header', 'Value']} />
-                  <textarea
-                    className={styles.mockBodyArea}
+                  <Textarea
+                    className="min-h-[70px] resize-y rounded-sm bg-[var(--bg-base)] font-mono text-[11.5px]"
                     placeholder={'{\n  "id": "{{id}}"\n}'}
                     value={route.body || ''}
                     onChange={e => updateRoute(i, { body: e.target.value })}
                   />
                 </div>
               ))}
-              <div className={styles.mockRoutesFooter}>
+              <div className="flex items-center gap-2">
                 <Btn variant="ghost" size="sm" onClick={addRoute}><Icon name="plus" size={11} /> Add Route</Btn>
-                <div style={{ flex: 1 }} />
+                <div className="flex-1" />
                 <Btn variant="primary" size="sm" onClick={saveRoutes}>Save Routes</Btn>
               </div>
             </>
@@ -1044,7 +1123,7 @@ export function DashboardModal() {
 
   return (
     <Modal title="Dashboard" icon="barChart" onClose={close} wide footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
-      <div className={styles.settingsGrid} style={{ marginBottom: 14 }}>
+      <div className="mb-3.5 grid grid-cols-2 gap-3">
         <FormGroup label="Scope">
           <Select value={collectionId} onChange={e => setCollectionId(e.target.value)}>
             <option value="">All collections</option>
@@ -1057,7 +1136,7 @@ export function DashboardModal() {
 
       {!loading && analytics && (
         <>
-          <div className={styles.dashStatRow}>
+          <div className="flex flex-wrap gap-2.5">
             <DashStat label="Total requests" value={analytics.totalRequests} />
             <DashStat label="Avg latency"    value={`${analytics.avgLatencyMs}ms`} />
             <DashStat label="P95 latency"    value={`${analytics.p95LatencyMs}ms`} />
@@ -1075,33 +1154,33 @@ export function DashboardModal() {
 
           {mcpManifest?.tools?.length > 0 && (
             <>
-              <div className={styles.mcpSectionHeader}>
-                <h3 className={styles.sectionTitle} style={{ margin: 0 }}>MCP Server</h3>
+              <div className="mt-4 flex items-center justify-between">
+                <h3 className="m-0 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">MCP Server</h3>
                 <Btn variant="ghost" size="sm" onClick={() => setShowMcpConfig(v => !v)}>
                   <Icon name="sparkle" size={11} /> {showMcpConfig ? 'Hide' : 'Generate'} config
                 </Btn>
               </div>
-              <p className={styles.settingsHint} style={{ margin: '4px 0 8px' }}>
+              <p className="my-1 text-[11px] leading-[1.5] text-[var(--tx-faint)]">
                 This collection can be served as an MCP server — each request becomes a tool an AI agent can call directly.
               </p>
-              <div className={styles.mockList} style={{ width: 'auto' }}>
+              <div className="flex flex-col gap-1">
                 {mcpManifest.tools.map(t => (
-                  <div key={t.name} className={styles.mockRow} style={{ cursor: 'default' }}>
+                  <div key={t.name} className="flex cursor-default items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5">
                     <MethodBadge method={t.method || 'GET'} small />
-                    <div className={styles.mockInfo}>
-                      <span className={styles.mockName}>{t.name}</span>
-                      <span className={styles.mockMeta}>{t.url}</span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{t.name}</span>
+                      <span className="font-mono text-[10px] text-[var(--tx-faint)]">{t.url}</span>
                     </div>
                   </div>
                 ))}
               </div>
               {showMcpConfig && (
-                <div className={styles.mcpConfigBox}>
-                  <p className={styles.settingsHint} style={{ margin: '0 0 8px' }}>
+                <div className="mt-2.5 rounded-md border border-[var(--bd-subtle)] bg-[var(--bg-overlay)] px-3.5 py-3">
+                  <p className="mb-2 text-[11px] leading-[1.5] text-[var(--tx-faint)]">
                     Add this to your MCP client's config (e.g. Claude Desktop's <code>claude_desktop_config.json</code>):
                   </p>
-                  <pre className={styles.mcpConfigCode}>{JSON.stringify(mcpManifest.configSnippet, null, 2)}</pre>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <pre className="m-0 overflow-x-auto rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-3 py-2.5 font-mono text-[11px] leading-[1.5] whitespace-pre text-foreground">{JSON.stringify(mcpManifest.configSnippet, null, 2)}</pre>
+                  <div className="mt-2 flex justify-end">
                     <Btn variant="primary" size="sm" onClick={copyMcpConfig}>Copy config</Btn>
                   </div>
                 </div>
@@ -1111,31 +1190,31 @@ export function DashboardModal() {
 
           {score?.topIssues?.length > 0 && (
             <>
-              <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>Top issues</h3>
-              <div className={styles.mockList} style={{ width: 'auto' }}>
+              <h3 className="m-0 mt-4 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">Top issues</h3>
+              <div className="mt-2 flex flex-col gap-1">
                 {score.topIssues.map(issue => (
-                  <div key={issue.id} className={styles.mockRow} style={{ cursor: 'default' }}>
-                    <div className={styles.mockInfo}>
-                      <span className={styles.mockName}>{issue.label}</span>
-                      <span className={styles.mockMeta}>{issue.fix}</span>
+                  <div key={issue.id} className="flex cursor-default items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5">
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{issue.label}</span>
+                      <span className="font-mono text-[10px] text-[var(--tx-faint)]">{issue.fix}</span>
                     </div>
-                    <span className={styles.colCount}>{issue.count} request{issue.count === 1 ? '' : 's'}</span>
+                    <span className="shrink-0 text-[11px] text-[var(--tx-faint)]">{issue.count} request{issue.count === 1 ? '' : 's'}</span>
                   </div>
                 ))}
               </div>
             </>
           )}
 
-          <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>By request</h3>
+          <h3 className="m-0 mt-4 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">By request</h3>
           {analytics.requestBreakdown.length === 0 && (
-            <p className={styles.runnerEmpty}>No tracked calls yet — requests sent from a saved collection request will show up here.</p>
+            <p className="p-6 text-center text-[12px] text-[var(--tx-faint)]">No tracked calls yet — requests sent from a saved collection request will show up here.</p>
           )}
-          <div className={styles.mockList} style={{ width: 'auto' }}>
+          <div className="mt-2 flex flex-col gap-1">
             {analytics.requestBreakdown.map(r => (
-              <div key={r.requestId} className={styles.mockRow} style={{ cursor: 'default' }}>
-                <div className={styles.mockInfo}>
-                  <span className={styles.mockName}>{r.requestName}</span>
-                  <span className={styles.mockMeta}>{r.totalRequests} calls · avg {r.avgLatencyMs}ms · {r.errorRate}% errors</span>
+              <div key={r.requestId} className="flex cursor-default items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{r.requestName}</span>
+                  <span className="font-mono text-[10px] text-[var(--tx-faint)]">{r.totalRequests} calls · avg {r.avgLatencyMs}ms · {r.errorRate}% errors</span>
                 </div>
               </div>
             ))}
@@ -1143,16 +1222,16 @@ export function DashboardModal() {
 
           {analytics.recentErrors.length > 0 && (
             <>
-              <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>Recent errors</h3>
-              <div className={styles.mockList} style={{ width: 'auto' }}>
+              <h3 className="m-0 mt-4 text-[11px] font-bold tracking-wide text-[var(--tx-faint)] uppercase">Recent errors</h3>
+              <div className="mt-2 flex flex-col gap-1">
                 {analytics.recentErrors.map(e => (
-                  <div key={e.id} className={styles.mockRow} style={{ cursor: 'default' }}>
+                  <div key={e.id} className="flex cursor-default items-center gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5">
                     <MethodBadge method={e.method || 'GET'} small />
-                    <div className={styles.mockInfo}>
-                      <span className={styles.mockName}>{e.requestName || e.url}</span>
-                      <span className={styles.mockMeta}>{timeAgo(e.timestamp)}</span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{e.requestName || e.url}</span>
+                      <span className="font-mono text-[10px] text-[var(--tx-faint)]">{timeAgo(e.timestamp)}</span>
                     </div>
-                    <span className={styles.colCount} style={{ color: 'var(--err)' }}>{e.status} {e.statusText}</span>
+                    <span className="shrink-0 text-[11px] text-destructive">{e.status} {e.statusText}</span>
                   </div>
                 ))}
               </div>
@@ -1167,9 +1246,9 @@ export function DashboardModal() {
 function DashStat({ label, value, tone }) {
   const color = tone === 'ok' ? 'var(--ok)' : tone === 'err' ? 'var(--err)' : tone === 'warn' ? 'var(--warn)' : 'var(--tx-base)'
   return (
-    <div className={styles.dashStat}>
-      <span className={styles.dashStatValue} style={{ color }}>{value}</span>
-      <span className={styles.dashStatLabel}>{label}</span>
+    <div className="flex min-w-[110px] flex-col gap-0.5 rounded-lg border border-[var(--bd-subtle)] bg-[var(--bg-overlay)] px-3.5 py-2.5">
+      <span className="text-[18px] font-bold" style={{ color }}>{value}</span>
+      <span className="text-[10.5px] text-[var(--tx-faint)]">{label}</span>
     </div>
   )
 }
@@ -1219,27 +1298,27 @@ export function ProfilesModal() {
     <Modal title={`Audience Profiles — ${col.name}`} icon="shield" onClose={close} wide footer={<Btn variant="ghost" onClick={close}>Close</Btn>}>
       {!editing && (
         <>
-          <p className={styles.settingsHint} style={{ margin: '0 0 12px' }}>
+          <p className="mb-3 text-[11.5px] text-[var(--tx-faint)]">
             A profile scopes this collection to a subset of requests for a given audience — export or generate an MCP server from just that slice, with chosen headers/params stripped.
           </p>
-          <Btn variant="primary" size="sm" onClick={() => setEditing('new')} style={{ marginBottom: 12 }}>
+          <Btn variant="primary" size="sm" onClick={() => setEditing('new')} className="mb-3 self-start">
             <Icon name="plus" size={11} /> New profile
           </Btn>
           {loading && <Spinner size={14} />}
-          {!loading && profiles.length === 0 && <p className={styles.runnerEmpty}>No profiles yet.</p>}
-          <div className={styles.mockList} style={{ width: 'auto' }}>
+          {!loading && profiles.length === 0 && <p className="p-6 text-center text-[12px] text-[var(--tx-faint)]">No profiles yet.</p>}
+          <div className="flex flex-col gap-1">
             {profiles.map(p => (
-              <div key={p.id} className={styles.mockRow} style={{ cursor: 'default', alignItems: 'flex-start' }}>
-                <div className={styles.mockInfo}>
-                  <span className={styles.mockName}>{p.name}</span>
-                  <span className={styles.mockMeta}>
+              <div key={p.id} className="flex cursor-default items-start gap-2 rounded-sm border border-[var(--bd-faint)] bg-[var(--bg-raised)] px-2 py-1.5">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-foreground">{p.name}</span>
+                  <span className="font-mono text-[10px] text-[var(--tx-faint)]">
                     {impact[p.id] ? `${impact[p.id].includedRequests} of ${impact[p.id].totalRequests} requests` : '…'}
                     {p.redactHeaders.length > 0 && ` · redacts ${p.redactHeaders.length} header(s)`}
                     {p.redactParams.length > 0 && ` · redacts ${p.redactParams.length} param(s)`}
                   </span>
                 </div>
                 <select
-                  className={styles.exportSel}
+                  className="shrink-0 cursor-pointer bg-transparent text-[10px] text-[var(--tx-faint)] hover:text-muted-foreground"
                   value=""
                   onChange={e => { if (e.target.value) exportProfile(p, e.target.value); e.target.value = '' }}
                   title="Export this profile"
@@ -1305,7 +1384,7 @@ function ProfileEditor({ collection, profile, onCancel, onSaved }) {
   }
 
   return (
-    <div className={styles.settingsGrid} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="flex flex-col gap-2.5">
       <FormGroup label="Name">
         <Input value={name} onChange={e => setName(e.target.value)} placeholder="Public, Partner, AI Agent…" />
       </FormGroup>
@@ -1319,15 +1398,15 @@ function ProfileEditor({ collection, profile, onCancel, onSaved }) {
         </Select>
       </FormGroup>
       <FormGroup label={mode === 'allowlist' ? 'Included requests' : 'Excluded requests'}>
-        <div className={styles.mcpConfigBox} style={{ maxHeight: 180, overflowY: 'auto' }}>
+        <div className="max-h-[180px] overflow-y-auto rounded-md border border-[var(--bd-subtle)] bg-[var(--bg-overlay)] px-3.5 py-3">
           {(collection.requests || []).map(r => (
-            <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12, cursor: 'pointer' }}>
+            <label key={r.id} className="flex cursor-pointer items-center gap-2 py-1 text-[12px]">
               <input type="checkbox" checked={requestIds.has(r.id)} onChange={() => toggleRequest(r.id)} />
               <MethodBadge method={r.method} small />
               {r.name}
             </label>
           ))}
-          {(collection.requests || []).length === 0 && <span className={styles.settingsHint}>This collection has no requests yet.</span>}
+          {(collection.requests || []).length === 0 && <span className="text-[11px] text-[var(--tx-faint)]">This collection has no requests yet.</span>}
         </div>
       </FormGroup>
       <FormGroup label="Redact headers (comma-separated, optional)">
@@ -1336,7 +1415,7 @@ function ProfileEditor({ collection, profile, onCancel, onSaved }) {
       <FormGroup label="Redact query params (comma-separated, optional)">
         <Input value={redactParams} onChange={e => setRedactParams(e.target.value)} placeholder="debug, internal_flag" />
       </FormGroup>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+      <div className="mt-1 flex justify-end gap-2">
         <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
         <Btn variant="primary" onClick={save} disabled={saving}>{saving ? <Spinner size={12} /> : 'Save profile'}</Btn>
       </div>

@@ -82,14 +82,14 @@ consolio --version
 consolio --help
 ```
 
-| Command | Flags | Description |
-| --- | --- | --- |
-| `start` (default) | `-p, --port <port>` (default `4242`)<br>`--no-open` — don't auto-open the browser<br>`--dev` — API-only mode for use alongside Vite HMR<br>`--project <path>` — project directory (default: cwd) | Start the consolio server |
-| `init` | `--name <name>` (default `"My Project"`) | Create `.consolio/` in the current directory |
-| `run <collection>` | `-e, --env <name>` — environment id or name<br>`-r, --reporter <type>` — `cli` \| `json` \| `junit` (default `cli`)<br>`-c, --concurrency <n>` — requests in parallel (default `1`)<br>`-d, --delay <ms>` — delay between batches (default `0`)<br>`--bail` — stop on first failing request<br>`--project <path>` — project directory (default: cwd) | Run a collection headlessly, no browser needed |
-| `scan` | `--project <path>` — project directory to scan (default: cwd)<br>`--path <subpath>` — subdirectory to scan instead of the whole project<br>`--base-url <url>` — prefix onto every discovered path<br>`-o, --out <file>` — write the discovered collection as JSON instead of printing a summary | Statically discover Express/Fastify/NestJS routes — no OpenAPI spec needed |
-| `mcp generate <collection>` | `-e, --env <name>` — environment id or name (affects which vars are treated as secret)<br>`--project <path>` — project directory<br>`-o, --out <file>` — write the tool manifest as JSON | Preview the MCP tool manifest a collection would expose, without starting a server |
-| `mcp serve <collection>` | `-e, --env <name>` — environment id or name, supplies `{{variables}}` and secrets<br>`--project <path>` — project directory | Serve a collection as an MCP server over stdio (for Claude Desktop, Cursor, etc.) |
+| Command                     | Flags                                                                                                                                                                                                                                                                                                                                                | Description                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `start` (default)           | `-p, --port <port>` (default `4242`)<br>`--no-open` — don't auto-open the browser<br>`--dev` — API-only mode for use alongside Vite HMR<br>`--project <path>` — project directory (default: cwd)                                                                                                                                                     | Start the consolio server                                                          |
+| `init`                      | `--name <name>` (default `"My Project"`)                                                                                                                                                                                                                                                                                                             | Create `.consolio/` in the current directory                                       |
+| `run <collection>`          | `-e, --env <name>` — environment id or name<br>`-r, --reporter <type>` — `cli` \| `json` \| `junit` (default `cli`)<br>`-c, --concurrency <n>` — requests in parallel (default `1`)<br>`-d, --delay <ms>` — delay between batches (default `0`)<br>`--bail` — stop on first failing request<br>`--project <path>` — project directory (default: cwd) | Run a collection headlessly, no browser needed                                     |
+| `scan`                      | `--project <path>` — project directory to scan (default: cwd)<br>`--path <subpath>` — subdirectory to scan instead of the whole project<br>`--base-url <url>` — prefix onto every discovered path<br>`-o, --out <file>` — write the discovered collection as JSON instead of printing a summary                                                      | Statically discover Express/Fastify/NestJS routes — no OpenAPI spec needed         |
+| `mcp generate <collection>` | `-e, --env <name>` — environment id or name (affects which vars are treated as secret)<br>`--project <path>` — project directory<br>`-o, --out <file>` — write the tool manifest as JSON                                                                                                                                                             | Preview the MCP tool manifest a collection would expose, without starting a server |
+| `mcp serve <collection>`    | `-e, --env <name>` — environment id or name, supplies `{{variables}}` and secrets<br>`--project <path>` — project directory                                                                                                                                                                                                                          | Serve a collection as an MCP server over stdio (for Claude Desktop, Cursor, etc.)  |
 
 ```bash
 consolio start --port 8080 --no-open
@@ -199,13 +199,13 @@ A request's **Info** tab has a description field and a "Fix with AI" button. Thi
 key, model, or endpoint, and never calls out unless you've configured a provider and clicked the button.
 Supported providers:
 
-| Provider | Needs | Notes |
-| --- | --- | --- |
-| **Anthropic** | API key | Model defaults to `claude-sonnet-4-6` if left blank |
-| **OpenAI** | API key, model | e.g. `gpt-4o-mini` |
-| **Azure OpenAI** | API key, base URL, model | Base URL is the full deployment URL, e.g. `https://<resource>.openai.azure.com/openai/deployments/<deployment>`; model is your deployment name |
-| **Ollama** | Model | Local by default (`http://localhost:11434`) or point Base URL at a remote/cloud Ollama instance; no API key needed |
-| **Other (OpenAI-compatible)** | Base URL, model | Any server that speaks the OpenAI Chat Completions shape — vLLM, LM Studio, OpenRouter, Ollama's own `/v1` endpoint, etc.; API key optional |
+| Provider                      | Needs                    | Notes                                                                                                                                          |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Anthropic**                 | API key                  | Model defaults to `claude-sonnet-4-6` if left blank                                                                                            |
+| **OpenAI**                    | API key, model           | e.g. `gpt-4o-mini`                                                                                                                             |
+| **Azure OpenAI**              | API key, base URL, model | Base URL is the full deployment URL, e.g. `https://<resource>.openai.azure.com/openai/deployments/<deployment>`; model is your deployment name |
+| **Ollama**                    | Model                    | Local by default (`http://localhost:11434`) or point Base URL at a remote/cloud Ollama instance; no API key needed                             |
+| **Other (OpenAI-compatible)** | Base URL, model          | Any server that speaks the OpenAI Chat Completions shape — vLLM, LM Studio, OpenRouter, Ollama's own `/v1` endpoint, etc.; API key optional    |
 
 Clicking the button sends the request's method, URL, declared headers/params, and a truncated preview
 of its last response to whichever provider you've configured, and proposes a one-sentence description
@@ -238,6 +238,30 @@ there's no cloud hosting or gateway involved. Point a client at it directly, e.g
   }
 }
 ```
+
+Plugins can also add read-only tabs to either pane. The renderer runs on the server and returns a
+small serializable view model, so installed plugins do not execute arbitrary code in the browser:
+
+```js
+module.exports = {
+  paneTabs: {
+    request: [{
+      id: 'overview', label: 'Overview',
+      render: ({ request }) => ({ kind: 'table', rows: [
+        { label: 'Method', value: request.method },
+        { label: 'URL', value: request.url },
+      ] }),
+    }],
+    response: [{
+      id: 'timing', label: 'Timing',
+      render: ({ response }) => ({ text: `${response.elapsed} ms` }),
+    }],
+  },
+}
+```
+
+Each `render` function receives `{ request, response }` (the unused value may be absent before a
+response exists) and may return `{ text }` or `{ kind: 'table', rows: [{ label, value }] }`.
 
 The Dashboard's **MCP Server** section (when a collection is selected) shows the exact tool list and a
 "Generate config" button that produces this snippet ready to copy.
@@ -278,19 +302,19 @@ you decide to overwrite.
 Add assertions under a request's **Tests** tab; the collection runner and CLI runner both evaluate them
 server-side using the same engine:
 
-| Type | Checks |
-| --- | --- |
-| `status` | Response status equals a value |
-| `status_lt` | Response status is less than a value |
-| `status_in` | Response status is one of a comma-separated list |
-| `has_header` | A header is present |
-| `header_equals` | A header equals an exact value |
-| `body_contains` | Response body contains a substring |
-| `body_not_contains` | Response body does not contain a substring |
-| `body_json_path` | A JSON path (e.g. `data[0].id`) equals a value |
-| `body_not_empty` | Response body is non-empty |
-| `response_time` | Response time is at or under a threshold (ms) |
-| `response_time_gt` | Response time exceeds a threshold (ms) |
+| Type                | Checks                                           |
+| ------------------- | ------------------------------------------------ |
+| `status`            | Response status equals a value                   |
+| `status_lt`         | Response status is less than a value             |
+| `status_in`         | Response status is one of a comma-separated list |
+| `has_header`        | A header is present                              |
+| `header_equals`     | A header equals an exact value                   |
+| `body_contains`     | Response body contains a substring               |
+| `body_not_contains` | Response body does not contain a substring       |
+| `body_json_path`    | A JSON path (e.g. `data[0].id`) equals a value   |
+| `body_not_empty`    | Response body is non-empty                       |
+| `response_time`     | Response time is at or under a threshold (ms)    |
+| `response_time_gt`  | Response time exceeds a threshold (ms)           |
 
 ### Pre/post request scripts
 
@@ -392,6 +416,30 @@ module.exports = {
 }
 ```
 
+Plugins can also add read-only tabs to the request or response pane. Tab renderers run on the server
+and return a serializable `{ text }` or `{ kind: 'table', rows: [{ label, value }] }` view model:
+
+```js
+module.exports = {
+  paneTabs: {
+    request: [{
+      id: 'overview', label: 'Overview',
+      render: ({ request }) => ({ kind: 'table', rows: [
+        { label: 'Method', value: request.method },
+        { label: 'URL', value: request.url },
+      ] }),
+    }],
+    response: [{
+      id: 'timing', label: 'Timing',
+      render: ({ response }) => ({ text: `${response.elapsed} ms` }),
+    }],
+  },
+}
+```
+
+The Plugins modal shows each plugin's author, version, release, description, and concrete developer
+use-case. Plugin-provided tabs identify their provider and link back to that plugin's entry.
+
 `requestHooks` run first, **before** `{{VAR}}`/`{{% tag %}}` resolution — they see raw, unresolved
 values, so they can't rely on the final literal URL/header/body content (a request-signing plugin,
 for example, won't see the fully-resolved bytes it would need to sign). They can mutate or replace the
@@ -408,12 +456,16 @@ one-click **Install** button (this is the one path that's allowed to install by 
 only ever sends a fixed directory name that the server checks against what it actually shipped, never
 an arbitrary string):
 
-| Bundled plugin | Hook type | What it does |
-| --- | --- | --- |
-| [`consolio-plugin-dynamic-vars`](plugins/consolio-plugin-dynamic-vars) | `templateTags` | Postman-style dynamic test data: `{{% uuid %}}`, `{{% randomEmail %}}`, `{{% randomInt %}}`, `{{% isoTimestamp %}}`, and more |
-| [`consolio-plugin-correlation-id`](plugins/consolio-plugin-correlation-id) | `requestHooks` | Adds a unique `X-Request-Id` header to every request, to grep for in the target server's logs |
-| [`consolio-plugin-idempotency-key`](plugins/consolio-plugin-idempotency-key) | `requestHooks` | Adds a unique `Idempotency-Key` header to POST/PUT/PATCH/DELETE, so retrying a failed send can't double-submit against APIs that honor it |
-| [`consolio-plugin-perf-budget`](plugins/consolio-plugin-perf-budget) | `responseHooks` | Flags responses slower than 1000ms with an `x-consolio-perf-warning` header |
+| Bundled plugin                                                                             | Hook type                      | What it does                                                                                                                              |
+| ------------------------------------------------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [`consolio-plugin-dynamic-vars`](plugins/consolio-plugin-dynamic-vars)                     | `templateTags`                 | Postman-style dynamic test data: `{{% uuid %}}`, `{{% randomEmail %}}`, `{{% randomInt %}}`, `{{% isoTimestamp %}}`, and more             |
+| [`consolio-plugin-correlation-id`](plugins/consolio-plugin-correlation-id)                 | `requestHooks`                 | Adds a unique `X-Request-Id` header to every request, to grep for in the target server's logs                                             |
+| [`consolio-plugin-idempotency-key`](plugins/consolio-plugin-idempotency-key)               | `requestHooks`                 | Adds a unique `Idempotency-Key` header to POST/PUT/PATCH/DELETE, so retrying a failed send can't double-submit against APIs that honor it |
+| [`consolio-plugin-perf-budget`](plugins/consolio-plugin-perf-budget)                       | `responseHooks`                | Flags responses slower than 1000ms with an `x-consolio-perf-warning` header                                                               |
+| [`consolio-plugin-request-inspector`](plugins/consolio-plugin-request-inspector)           | Request tab                    | Shows the request method, URL, enabled parameters/headers, and body type                                                                  |
+| [`consolio-plugin-response-diagnostics`](plugins/consolio-plugin-response-diagnostics)     | Response tab                   | Shows status, timing, body type, payload size, and content type                                                                           |
+| [`consolio-plugin-request-response-audit`](plugins/consolio-plugin-request-response-audit) | Both panes                     | Adds matching audit tabs for request shape and response outcome                                                                           |
+| [`consolio-plugin-security-headers`](plugins/consolio-plugin-security-headers)             | `responseHooks` + Response tab | Flags missing CSP, clickjacking, MIME-sniffing, referrer, and permissions protections before production                                   |
 
 A minimal [`consolio-plugin-example`](examples/consolio-plugin-example) also lives under `examples/`,
 showing the full hook contract (all three hook types) for anyone writing their own plugin from scratch.
@@ -468,9 +520,9 @@ npm install && npm run build && npm start
 
 `npm run dev` starts two processes via `concurrently`:
 
-| Process | Port | Description |
-| --- | --- | --- |
-| API server | `:4242` | Fastify — handles all `/api/*` and `/ws` |
+| Process         | Port    | Description                                     |
+| --------------- | ------- | ----------------------------------------------- |
+| API server      | `:4242` | Fastify — handles all `/api/*` and `/ws`        |
 | Vite dev server | `:5173` | React HMR — proxies `/api` and `/ws` to `:4242` |
 
 Open `http://localhost:5173` for hot-reload development. The server at `:4242` is API-only in dev mode

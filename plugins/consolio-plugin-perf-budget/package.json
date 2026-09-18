@@ -1,7 +1,10 @@
 {
     "name": "consolio-plugin-perf-budget",
     "version": "1.0.0",
+    "author": "Consolio",
+    "release": "stable",
     "description": "Flags responses slower than 1000ms with an x-consolio-perf-warning header, so slow endpoints stand out in the Headers tab during manual testing.",
+    "useCase": "Spot latency regressions during endpoint exploration without opening a separate timing tool or dashboard.",
     "main": "index.js",
     "type": "commonjs",
     "private": true

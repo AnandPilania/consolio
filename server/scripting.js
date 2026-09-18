@@ -2,9 +2,6 @@ import vm from 'node:vm';
 
 const SCRIPT_TIMEOUT_MS = 3000;
 
-// Sandboxed pre/post-request script execution. Mirrors the API documented in
-// README.md: consolio.log/setVariable/getVariable, with request/response/environment
-// as context. Runs in a fresh vm context so scripts can't reach require/process/fs.
 export function runScript(code, context = {}) {
     if (!code?.trim()) return { logs: [], error: null, modified: {} };
     const logs = [];

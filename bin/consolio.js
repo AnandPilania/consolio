@@ -32,8 +32,8 @@ program
         if (options.dev) process.env.CONSOLIO_DEV = 'true';
         console.log(BANNER);
         await startServer({
-            port:        parseInt(options.port),
-            autoOpen:    options.open,
+            port: parseInt(options.port),
+            autoOpen: options.open,
             projectPath: options.project,
         });
     });

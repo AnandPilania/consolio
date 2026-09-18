@@ -8,7 +8,7 @@ import { ResponsePane }   from './components/response/ResponsePane'
 import { CustomiseModal } from './components/modals/CustomiseModal'
 import { NewCollectionModal, ImportModal, RunnerModal, SettingsModal, CodeGenModal, MockManagerModal, PluginManagerModal, DashboardModal, ProfilesModal } from './components/modals/Modals'
 import { Notification }   from './components/shared/Notification'
-import styles from './App.module.css'
+import { Toaster }        from '@/components/ui/sonner'
 
 export default function App() {
   const boot           = useStore(s => s.boot)
@@ -52,12 +52,12 @@ export default function App() {
   const responsePanel = panels.responsePane
 
   return (
-    <div className={styles.app}>
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Topbar />
 
-      <div className={styles.workspace}>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Horizontal split: Sidebar | Main ──────────────────────────── */}
-        <PanelGroup direction="horizontal" className={styles.hGroup}>
+        <PanelGroup direction="horizontal" className="h-full w-full">
 
           {sidebarPanel.visible
             ? <Panel
@@ -66,7 +66,7 @@ export default function App() {
                 minSize={Number(toPct(sidebarPanel.minSize))}
                 maxSize={Number(toPct(sidebarPanel.maxSize))}
                 onResize={pct => useStore.getState().updatePanelSize('sidebar', fromPct(pct))}
-                style={{ overflow: 'hidden' }}
+                className="overflow-hidden"
               >
                 <Sidebar />
               </Panel>
@@ -74,13 +74,15 @@ export default function App() {
           }
 
           {sidebarPanel.visible
-            ? <PanelResizeHandle id="h-handle" className={styles.hHandle} />
+            ? <PanelResizeHandle id="h-handle" className="group relative w-1 shrink-0 cursor-col-resize bg-[var(--bd-faint)] transition-colors hover:bg-[var(--accent-glow)] data-[resize-handle-active]:bg-[var(--accent-glow)]">
+                <span className="absolute top-1/2 left-1/2 h-8 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100 group-data-[resize-handle-active]:opacity-100" />
+              </PanelResizeHandle>
             : null
           }
 
           {/* ── Vertical split: Request / Response ──────────────────────── */}
-          <Panel id="main" style={{ overflow: 'hidden', minWidth: 0 }}>
-            <PanelGroup direction="vertical" className={styles.vGroup}>
+          <Panel id="main" className="min-w-0 overflow-hidden">
+            <PanelGroup direction="vertical" className="h-full w-full">
 
               {requestPanel.visible
                 ? <Panel
@@ -89,7 +91,7 @@ export default function App() {
                     minSize={Number(requestPanel.minSize)}
                     maxSize={Number(requestPanel.maxSize)}
                     onResize={pct => useStore.getState().updatePanelSize('requestPane', pct)}
-                    style={{ overflow: 'hidden' }}
+                    className="overflow-hidden"
                   >
                     <RequestPane />
                   </Panel>
@@ -97,7 +99,9 @@ export default function App() {
               }
 
               {requestPanel.visible && responsePanel.visible
-                ? <PanelResizeHandle id="v-handle" className={styles.vHandle} />
+                ? <PanelResizeHandle id="v-handle" className="group relative h-1 shrink-0 cursor-row-resize bg-[var(--bd-faint)] transition-colors hover:bg-[var(--accent-glow)] data-[resize-handle-active]:bg-[var(--accent-glow)]">
+                    <span className="absolute top-1/2 left-1/2 h-0.5 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100 group-data-[resize-handle-active]:opacity-100" />
+                  </PanelResizeHandle>
                 : null
               }
 
@@ -108,7 +112,7 @@ export default function App() {
                     minSize={Number(requestPanel.minSize)}
                     maxSize={Number(requestPanel.maxSize)}
                     onResize={pct => useStore.getState().updatePanelSize('responsePane', pct)}
-                    style={{ overflow: 'hidden' }}
+                    className="overflow-hidden"
                   >
                     <ResponsePane />
                   </Panel>
@@ -116,7 +120,7 @@ export default function App() {
               }
 
               {!requestPanel.visible && !responsePanel.visible && (
-                <div className={styles.allHidden}>
+                <div className="flex flex-1 items-center justify-center p-6 text-center text-[13px] text-[var(--tx-faint)]">
                   <p>All panels hidden — open <strong>Customise Layout</strong> to restore them.</p>
                 </div>
               )}
@@ -140,6 +144,7 @@ export default function App() {
       {modal === 'profiles'      && <ProfilesModal />}
 
       <Notification />
+      <Toaster />
     </div>
   )
 }

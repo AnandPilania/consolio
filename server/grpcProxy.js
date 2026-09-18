@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sendToType } from './wsRelay.js';
 
-// One in-flight call per UI tab, same one-per-tab model as the other protocol proxies.
 const activeCalls = new Map();
 
 const sendToUi = (wss, tabId, payload) => sendToType(wss, `grpc-proxy:${tabId}`, payload);
@@ -19,9 +18,6 @@ function splitMethodPath(methodPath) {
     return [methodPath.slice(0, idx), methodPath.slice(idx + 1)];
 }
 
-// proto-loader only reads from a file path, so the pasted .proto text is written to a
-// throwaway temp file for the duration of this one parse call, then cleaned up immediately —
-// loadSync fully parses the descriptor into memory, nothing else needs the file afterward.
 export function loadProtoServices(protoText) {
     const dir = mkdtempSync(join(tmpdir(), 'consolio-grpc-'));
     const file = join(dir, 'service.proto');

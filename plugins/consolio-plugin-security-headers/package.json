@@ -1,0 +1,11 @@
+{
+    "name": "consolio-plugin-security-headers",
+    "version": "1.0.0",
+    "author": "Consolio",
+    "release": "stable",
+    "description": "Audits common browser security response headers and highlights missing protections.",
+    "useCase": "Catch missing CSP, clickjacking, MIME-sniffing, referrer, and permissions protections while manually testing an API or web endpoint.",
+    "main": "index.js",
+    "type": "commonjs",
+    "private": true
+}

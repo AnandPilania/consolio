@@ -10,4 +10,19 @@ module.exports = {
             }
         },
     ],
+    paneTabs: {
+        response: [{
+            id: 'budget',
+            label: 'Budget',
+            render: ({ response }) => ({
+                kind: 'table',
+                rows: [
+                    { label: 'Elapsed', value: `${response.elapsed ?? 0} ms` },
+                    { label: 'Budget', value: `${BUDGET_MS} ms` },
+                    { label: 'Result', value: response.elapsed > BUDGET_MS ? 'Over budget' : 'Within budget' },
+                    { label: 'Why it helps', value: 'Makes latency regressions visible during endpoint testing' },
+                ],
+            }),
+        }],
+    },
 }
